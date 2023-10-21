@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "spamdfba"
+version = "0.1.0"
+description = ""
+authors = ["ParsaGhadermazi <54489047+ParsaGhadermazi@users.noreply.github.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+cobra = "^0.27.0"
+torch = "^2.1.0"
+ray = "^2.7.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
