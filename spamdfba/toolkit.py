@@ -12,6 +12,7 @@ import pandas as pd
 import os
 import time
 
+
 class NN(nn.Module):
     """
     This class is a subclass of nn.Module and is a general class for defining function approximators in the RL problems.
@@ -36,22 +37,6 @@ class NN(nn.Module):
         out=self.output(out)
         return out
 
-
-def timer():
-    "A simple classic decorator for timing a function/method"
-    def timed(func):
-        def wrapper(*args, **kwargs):
-            start = time.time()
-            result = func(*args, **kwargs)
-            end = time.time()
-            print(f"Finished {func.__name__} in {end - start} seconds")
-            return result
-        return wrapper
-    return timed
-
-
-
-
 class Environment:
     """ An environment is a collection of the following:
         agents: a list of objects of class Agent
@@ -73,10 +58,9 @@ class Environment:
                 batch_per_episode:int=1000,
                 number_of_batches:int=100,
                 dt:float=0.1,
-                episode_time:float=1000,
                 dilution_rate:float=0.05,
-                max_c:dict={},
                 episodes_per_batch:int=10,
+                episode_length:int=1000,
                 training:bool=True,
                 constant:list=[]
                 
@@ -88,7 +72,6 @@ class Environment:
         self.extracellular_reactions = extracellular_reactions
         self.dt = dt
         self.constant=constant
-        self.episode_length = int(episode_time/dt)
         self.episodes_per_batch=episodes_per_batch
         self.number_of_batches=number_of_batches
         self.batch_per_episode = batch_per_episode
@@ -103,15 +86,18 @@ class Environment:
         self.inlet_conditions = np.zeros((len(self.species),))
         for key,value in inlet_conditions.items():
             self.inlet_conditions[self.species.index(key)]=value
-        self.min_c = np.zeros((len(self.species),))
-        self.max_c = np.ones((len(self.species),))
-        for key,value in max_c.items():
-            self.max_c[self.species.index(key)]=value
         self.set_observables()
         self.set_networks()
         self.reset()
+        self.time_dict={
+            "optimization":[],
+            "step":[],
+            "episode":[]
+                        }
+        self.episode_length=episode_length
+        self.rewards={agent.name:[] for agent in self.agents}
         
-        print("Environment {} created successfully!.".format(self.name))
+        
 
     
     def resolve_exchanges(self)->dict:
@@ -139,6 +125,12 @@ class Environment:
     def reset(self):
         """ Resets the environment to its initial state."""
         self.state = self.initial_condition.copy()
+        self.rewards={agent.name:[] for agent in self.agents}
+        self.time_dict={
+            "optimization":[],
+            "step":[],
+            "episode":[]
+                        }
     
     def step(self):
         """ Performs a single step in the environment."""
@@ -158,8 +150,9 @@ class Environment:
                     M.model.reactions[M.actions[index]].lower_bound=max(M.a[index],M.model.reactions[M.actions[index]].lower_bound)
                 else:
                     M.model.reactions[M.actions[index]].lower_bound=min(M.a[index],10)
-                
+            t_0=time.time() 
             Sols[i] = self.agents[i].model.optimize()
+            self.time_dict["optimization"].append(time.time()-t_0)
             if Sols[i].status == 'infeasible':
                 self.agents[i].reward=-1
                 dCdt[i] = 0
@@ -193,24 +186,6 @@ class Environment:
         Cp=self.state.copy()
         return C,list(i.reward for i in self.agents),list(i.a for i in self.agents),Cp
 
-
-
-    def generate_random_c(self,size:int):
-        """ Generates a random initial condition for the environment."""
-        return np.random.uniform(low=self.min_c, high=self.max_c, size=(size,len(self.species))).T
-
-    def batch_step(self,C:np.ndarray):
-        """ Performs a batch of steps in the environment in parallel.
-        This is just an experimental feature and is not yet implemented.
-        C is a m*n where m is the number of species in the system and n 
-        is the number of parallel steps.
-        """
-        batch_episodes=[]
-        for batch in range(C.shape[1]):
-            batch_episodes.append(Environment._step_p.remote(self,C[:,batch]))
-        batch_episodes = ray.get(batch_episodes)
-
-        return batch_episodes
 
     def set_observables(self):
         """ Sets the observables for the agents in the environment."""
@@ -318,7 +293,6 @@ def Build_Mapping_Matrix(models:list[cobra.Model])->dict:
 
     Ex_sp = []
     Ex_rxns = []
-    Temp_Map={}
     for model in models:
         Ex_rxns.extend([(model,list(model.reactions[rxn].metabolites)[0].id,rxn) for rxn in model.exchange_reactions if model.reactions[rxn].id.endswith("_e") and rxn!=model.biomass_ind])
     Ex_sp=list(set([item[1] for item in Ex_rxns]))
@@ -328,54 +302,7 @@ def Build_Mapping_Matrix(models:list[cobra.Model])->dict:
 
     return {"Ex_sp": Ex_sp, "Mapping_Matrix": Mapping_Matrix}
 
-@ray.remote
-def simulate(env,episodes=200,steps=1000):
-    """ Simulates the environment for a given number of episodes and steps."""
-    env.rewards=np.zeros((len(env.agents),episodes))
-    env.record=[]
-    for episode in range(episodes):
-        env.reset()
-        env.episode=episode
 
-        for agent in env.agents:
-            agent.rewards=[]
-        C=[]
-        episode_len=steps
-        for ep in range(episode_len):
-            env.t=episode_len-ep
-            s,r,a,sp=env.step()
-            for ind,ag in enumerate(env.agents):
-                ag.rewards.append(r[ind])
-                # ag.optimizer_reward_.zero_grad()
-                # # r_pred=ag.reward_network_(torch.FloatTensor(np.hstack([s[ag.observables],env.t])), torch.FloatTensor(a[ind]))
-                # # r_loss=nn.MSELoss()(r_pred,torch.FloatTensor(np.expand_dims(np.array(r[ind]),0)))
-                # # r_loss.backward()
-                # ag.optimizer_reward_.step()
-                ag.optimizer_value_.zero_grad()
-                Qvals = ag.critic_network_(torch.FloatTensor(np.hstack([s[ag.observables],env.t])), torch.FloatTensor(a[ind]))
-                next_actions = ag.actor_network_(torch.FloatTensor(np.hstack([sp[ag.observables],env.t-1])))
-                if env.t==1:
-                    next_Q = torch.FloatTensor([0])
-                else:
-                    next_Q = ag.critic_network_.forward(torch.FloatTensor(np.hstack([sp[ag.observables],env.t-1])), next_actions.detach())
-                Qprime = torch.FloatTensor(np.expand_dims(np.array(r[ind]),0))+ag.gamma*next_Q
-                critic_loss=nn.MSELoss()(Qvals,Qprime.detach())
-                critic_loss.backward()
-                ag.optimizer_value_.step()
-                ag.optimizer_policy_.zero_grad()
-                policy_loss = -ag.critic_network_(torch.FloatTensor(np.hstack([s[ag.observables],env.t])), ag.actor_network_(torch.FloatTensor(np.hstack([s[ag.observables],env.t])))).mean()
-                policy_loss.backward()
-                ag.optimizer_policy_.step()
-            C.append(env.state.copy())
-            env.record.append(np.hstack([env.state.copy(),np.reshape(np.array(env.temp_actions),(-1))]))
-
-        # pd.DataFrame(C,columns=env.species).to_csv("Data.csv")
-
-        for ag_ind,agent in enumerate(env.agents):
-            print(episode)
-            print(np.sum(agent.rewards))
-            env.rewards[ag_ind,episode]=np.sum(agent.rewards)
-    return env.rewards.copy(),env.record.copy()
 
 def general_kinetic(x,y):
     return 0.1*x*y/(10+x)
@@ -386,12 +313,19 @@ def mass_transfer(x,y):
     return 0.01*(x-y)
 
 def rollout(env):
+    t0_batch=time.time()
     batch_obs={key.name:[] for key in env.agents}
     batch_acts={key.name:[] for key in env.agents}
     batch_log_probs={key.name:[] for key in env.agents}
     batch_rews = {key.name:[] for key in env.agents}
     batch_rtgs = {key.name:[] for key in env.agents}
+    batch_times={"step":[],
+                 "episode":[],
+                 "optimization":[],
+                 "batch":[]}
+
     batch=[]
+    env.reset()
     for ep in range(env.episodes_per_batch):
         # batch.append(run_episode_single(env))
         batch.append(run_episode.remote(env))
@@ -402,23 +336,26 @@ def rollout(env):
             batch_acts[ag.name].extend(batch[ep][1][ag.name])
             batch_log_probs[ag.name].extend(batch[ep][2][ag.name])
             batch_rews[ag.name].append(batch[ep][3][ag.name])
-    batch
-
+        batch_times["step"].extend(batch[ep][4]["step"])
+        batch_times["episode"].extend(batch[ep][4]["episode"])
+        batch_times["optimization"].extend(batch[ep][4]["optimization"])
+    
     for ag in env.agents:
         env.rewards[ag.name].extend(list(np.sum(np.array(batch_rews[ag.name]),axis=1)))
-
-    
+        
     for agent in env.agents:
 
         batch_obs[agent.name] = torch.tensor(batch_obs[agent.name], dtype=torch.float)
         batch_acts[agent.name] = torch.tensor(batch_acts[agent.name], dtype=torch.float)
         batch_log_probs[agent.name] = torch.tensor(batch_log_probs[agent.name], dtype=torch.float)
         batch_rtgs[agent.name] = agent.compute_rtgs(batch_rews[agent.name]) 
-    return batch_obs,batch_acts, batch_log_probs, batch_rtgs
+    batch_times["batch"].append(time.time()-t0_batch)
+    return batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env.rewards.copy()
 
 @ray.remote
 def run_episode(env):
     """ Runs a single episode of the environment. """
+    t_0_ep=time.time()
     batch_obs = {key.name:[] for key in env.agents}
     batch_acts = {key.name:[] for key in env.agents}
     batch_log_probs = {key.name:[] for key in env.agents}
@@ -431,16 +368,18 @@ def run_episode(env):
         for agent in env.agents:   
             action, log_prob = agent.get_actions(np.hstack([obs[agent.observables],env.t]))
             agent.a=action
-            agent.log_prob=log_prob.detach()  
-        start=time.time()      
+            agent.log_prob=log_prob.detach() 
+        t_0_step=time.time()
         s,r,a,sp=env.step()
-        end=time.time()
+        env.time_dict["step"].append(time.time()-t_0_step)
         for ind,ag in enumerate(env.agents):
             batch_obs[ag.name].append(np.hstack([s[ag.observables],env.t]))
             batch_acts[ag.name].append(a[ind])
             batch_log_probs[ag.name].append(ag.log_prob)
             episode_rews[ag.name].append(r[ind])
-    return batch_obs,batch_acts, batch_log_probs, episode_rews
+        env.time_dict["step"].append(time.time()-t_0_step)
+    env.time_dict["episode"].append(time.time()-t_0_ep)
+    return batch_obs,batch_acts, batch_log_probs, episode_rews,env.time_dict,env.rewards
 
 def run_episode_single(env):
     """ Runs a single episode of the environment. """
@@ -481,19 +420,29 @@ class Simulation:
         self.save_dir=save_dir
         self.save_every=save_every
         self.overwrite=overwrite
+        self.report={}
         
     
     def run(self,solver:str="glpk",verbose:bool=True,initial_critic_error:float=100)->Environment:
-        
-        if not os.path.exists(self):
-            os.makedirs(os.path.join(self.save_dir,self.env))
+        self.report={"returns":{ag.name:[] for ag in self.env.agents}}
+        self.report["times"]={
+            "step":[],
+            "optimization":[],
+            "batch":[]
+        }            
+        if not os.path.exists(os.path.join(self.save_dir,self.env.name)):
+            os.makedirs(os.path.join(self.save_dir,self.env.name))
             
         for agent in self.env.agents:
-            agent.model.solver="glpk"
+            agent.model.solver=solver
             
         for batch in range(self.env.number_of_batches):
-            batch_obs,batch_acts, batch_log_probs, batch_rtgs=rollout(self.env)  
+            batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env_rew=rollout(self.env) 
+            self.report["times"]["step"].append(np.mean(batch_times["step"]))
+            self.report["times"]["optimization"].append(np.mean(batch_times["optimization"]))
+            self.report["times"]["batch"].append(np.mean(batch_times["batch"]))
             for agent in self.env.agents:
+                self.report["returns"][agent.name].append(env_rew[agent.name])
                 V, _= agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])  
                 A_k = batch_rtgs[agent.name] - V.detach()       
                 A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-5)   
@@ -509,22 +458,22 @@ class Simulation:
                             agent.optimizer_value_.step()   
                             err=critic_loss.item()  
                     if verbose:
-                        print("[bold green] Done![/bold green]")   
-                    else: 
-                        for _ in range(agent.grad_updates):                                                      
-                            
-                            V, curr_log_probs = agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])
-                            ratios = torch.exp(curr_log_probs - batch_log_probs[agent.name])
-                            surr1 = ratios * A_k.detach()
-                            surr2 = torch.clamp(ratios, 1 - agent.clip, 1 + agent.clip) * A_k
-                            actor_loss = (-torch.min(surr1, surr2)).mean()
-                            critic_loss = nn.MSELoss()(V, batch_rtgs[agent.name])
-                            agent.optimizer_policy_.zero_grad()
-                            actor_loss.backward(retain_graph=False)
-                            agent.optimizer_policy_.step()
-                            agent.optimizer_value_.zero_grad()
-                            critic_loss.backward()
-                            agent.optimizer_value_.step()                                                            
+                        print("Done!")   
+                else: 
+                    for _ in range(agent.grad_updates):                                                      
+                        
+                        V, curr_log_probs = agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])
+                        ratios = torch.exp(curr_log_probs - batch_log_probs[agent.name])
+                        surr1 = ratios * A_k.detach()
+                        surr2 = torch.clamp(ratios, 1 - agent.clip, 1 + agent.clip) * A_k
+                        actor_loss = (-torch.min(surr1, surr2)).mean()
+                        critic_loss = nn.MSELoss()(V, batch_rtgs[agent.name])
+                        agent.optimizer_policy_.zero_grad()
+                        actor_loss.backward(retain_graph=False)
+                        agent.optimizer_policy_.step()
+                        agent.optimizer_value_.zero_grad()
+                        critic_loss.backward()
+                        agent.optimizer_value_.step()                                                            
 
                 if batch%self.save_every==0:
                     if self.overwrite:
@@ -545,4 +494,9 @@ class Simulation:
                 if verbose:
                     print(f"Batch {batch} finished:")
                     for agent in self.env.agents:
-                        print(f"{agent.name} return was:  {np.mean(self.env.rewards[agent.name][-self.env.episodes_per_batch:])}")	
+                        print(f"{agent.name} return was:  {np.mean(self.env.rewards[agent.name][-self.env.episodes_per_batch:])}")
+    
+    def plot_learning_curves(self):
+        pass
+    def print_training_times(self):
+        pass

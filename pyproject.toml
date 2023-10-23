@@ -9,6 +9,7 @@ python = "^3.10"
 cobra = "^0.27.0"
 torch = "^2.1.0"
 ray = "^2.7.1"
+ipywidgets = "^8.1.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
