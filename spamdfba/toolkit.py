@@ -5,13 +5,26 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal,Normal
-import pickle
+import pickle,logging
 import time
 import ray
 import pandas as pd
 import os
 import time
-
+import plotly.graph_objs as go
+from rich.console import Console
+from rich.table import Table
+ray.init(log_to_driver=False,ignore_reinit_error=True)
+DEFAULT_PLOTLY_COLORS=['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
+                       'rgb(44, 160, 44)', 'rgb(214, 39, 40)',
+                       'rgb(148, 103, 189)', 'rgb(140, 86, 75)',
+                       'rgb(227, 119, 194)', 'rgb(127, 127, 127)',
+                       'rgb(188, 189, 34)', 'rgb(23, 190, 207)']
+DEFAULT_PLOTLY_COLORS_BACK=['rgba(31, 119, 180,0.2)', 'rgba(255, 127, 14,0.2)',
+                       'rgb(44, 160, 44,0.2)', 'rgb(214, 39, 40,0.2)',
+                       'rgba(148, 103, 189,0.2)', 'rgba(140, 86, 75,0.2)',
+                       'rgba(227, 119, 194,0.2)', 'rgba(127, 127, 127,0.2)',
+                       'rgba(188, 189, 34,0.2)', 'rgba(23, 190, 207,0.2)']
 
 class NN(nn.Module):
     """
@@ -326,6 +339,7 @@ def rollout(env):
 
     batch=[]
     env.reset()
+    
     for ep in range(env.episodes_per_batch):
         # batch.append(run_episode_single(env))
         batch.append(run_episode.remote(env))
@@ -424,11 +438,13 @@ class Simulation:
         
     
     def run(self,solver:str="glpk",verbose:bool=True,initial_critic_error:float=100)->Environment:
+        t_0_sim=time.time()
         self.report={"returns":{ag.name:[] for ag in self.env.agents}}
         self.report["times"]={
             "step":[],
             "optimization":[],
-            "batch":[]
+            "batch":[],
+            "simulation":[]
         }            
         if not os.path.exists(os.path.join(self.save_dir,self.env.name)):
             os.makedirs(os.path.join(self.save_dir,self.env.name))
@@ -495,8 +511,54 @@ class Simulation:
                     print(f"Batch {batch} finished:")
                     for agent in self.env.agents:
                         print(f"{agent.name} return was:  {np.mean(self.env.rewards[agent.name][-self.env.episodes_per_batch:])}")
+
+        self.report["times"]["simulation"].append(time.time()-t_0_sim)
+        
+    def plot_learning_curves(self,plot:bool=True):
+        fig = go.Figure()
+        for index,agent in enumerate(self.env.agents):
+            rets=pd.DataFrame(self.report["returns"][agent.name])
+            x=rets.index.to_list()
+            fig.add_trace(go.Scatter(
+                x=x,
+                y=rets.mean(axis=1).to_list(),
+                line=dict(color=DEFAULT_PLOTLY_COLORS[index]),
+                name=agent.name,
+                mode='lines'
+                        ))
+            fig.add_trace(go.Scatter(
+                        x=x+x[::-1],
+                        y=rets.max(axis=1).to_list()+rets.min(axis=1).to_list()[::-1],
+                        fill='toself',
+                        fillcolor=DEFAULT_PLOTLY_COLORS_BACK[index],
+                        line=dict(color='rgba(255,255,255,0)'),
+                        hoverinfo="skip",
+                        showlegend=False)
+                            )
+            fig.update_layout(
+                xaxis={
+                    "title":"Batch"
+                },
+                yaxis={
+                    "title":"Total Episode Return"
+                }
+                
+            )
+        if plot:
+            fig.show()
+        return fig
+            
+    def print_training_times(self,draw_table:bool=True):
+        report_times=pd.concat([pd.DataFrame.from_dict(self.report["times"],orient='index').fillna(method="ffill",axis=1).mean(axis=1),pd.DataFrame.from_dict(self.report["times"],orient='index').fillna(method="ffill",axis=1).std(axis=1)],axis=1).rename({0:"mean",1:"std"},axis=1).to_dict(orient="record")
+        if draw_table:
+            table = Table(title="Simulation times")
+            table.add_column("Level", justify="left", style="cyan", no_wrap=True)
+            table.add_column("Mean(s)", style="cyan",justify="left")
+            table.add_column("STD(s)", justify="left", style="cyan")
+            table.add_row("Optimization",str(report_times[1]["mean"]),str(report_times[1]["std"]))
+            table.add_row("Step",str(report_times[0]["mean"]),str(report_times[0]["std"]))
+            table.add_row("Batch",str(report_times[2]["mean"]),str(report_times[2]["std"]))
+            table.add_row("Simulation",str(report_times[3]["mean"]),"NA")
+            console = Console()
+            console.print(table)
     
-    def plot_learning_curves(self):
-        pass
-    def print_training_times(self):
-        pass

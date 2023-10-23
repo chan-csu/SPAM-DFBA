@@ -648,6 +648,18 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "plotly"
+version = "5.17.0"
+description = "An open-source, interactive data visualization library for Python"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+packaging = "*"
+tenacity = ">=6.2.0"
+
+[[package]]
 name = "pluggy"
 version = "0.13.1"
 description = "plugin and hook calling mechanisms for python"
@@ -962,6 +974,17 @@ python-versions = ">=3.8"
 mpmath = ">=0.19"
 
 [[package]]
+name = "tenacity"
+version = "8.2.3"
+description = "Retry code until it succeeds"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+doc = ["reno", "sphinx", "tornado (>=4.5)"]
+
+[[package]]
 name = "torch"
 version = "2.1.0"
 description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
@@ -1033,7 +1056,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "9343af11f27fb9deb05bc3ee414dae2047d8677f77b5e1baaf78c59ac52427c5"
+content-hash = "e35b80ea122631f04c39c3cabe5bfca89179176900561755515b3e1249b845e3"
 
 [metadata.files]
 aiosignal = []
@@ -1090,6 +1113,7 @@ pandas = []
 parso = []
 pexpect = []
 pickleshare = []
+plotly = []
 pluggy = [
     {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
     {file = "pluggy-0.13.1.tar.gz", hash = "sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0"},
@@ -1131,6 +1155,7 @@ sniffio = []
 stack-data = []
 swiglpk = []
 sympy = []
+tenacity = []
 torch = []
 traitlets = []
 typing-extensions = []
