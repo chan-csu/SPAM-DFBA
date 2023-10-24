@@ -14,17 +14,21 @@ import time
 import plotly.graph_objs as go
 from rich.console import Console
 from rich.table import Table
+from typing import Iterable
+# Ignore ray warnings to be communicated
 ray.init(log_to_driver=False,ignore_reinit_error=True)
+
 DEFAULT_PLOTLY_COLORS=['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
                        'rgb(44, 160, 44)', 'rgb(214, 39, 40)',
                        'rgb(148, 103, 189)', 'rgb(140, 86, 75)',
                        'rgb(227, 119, 194)', 'rgb(127, 127, 127)',
-                       'rgb(188, 189, 34)', 'rgb(23, 190, 207)']
+                       'rgb(188, 189, 34)', 'rgb(23, 190, 207)']*10
 DEFAULT_PLOTLY_COLORS_BACK=['rgba(31, 119, 180,0.2)', 'rgba(255, 127, 14,0.2)',
-                       'rgb(44, 160, 44,0.2)', 'rgb(214, 39, 40,0.2)',
+                       'rgba(44, 160, 44,0.2)', 'rgba(214, 39, 40,0.2)',
                        'rgba(148, 103, 189,0.2)', 'rgba(140, 86, 75,0.2)',
                        'rgba(227, 119, 194,0.2)', 'rgba(127, 127, 127,0.2)',
-                       'rgba(188, 189, 34,0.2)', 'rgba(23, 190, 207,0.2)']
+                       'rgba(188, 189, 34,0.2)', 'rgba(23, 190, 207,0.2)']*10
+
 
 class NN(nn.Module):
     """
@@ -52,23 +56,86 @@ class NN(nn.Module):
 
 class Environment:
     """ An environment is a collection of the following:
-        agents: a list of objects of class Agent
-        extracellular reactions: a list of dictionaries. This list should look like this:
-        {"reaction":{
+        Agents: a list of objects of class Agent, defined below.
+        extracellular reactions: a list of dictionaries that describes reaction that happens outside of cells.
+        An example of such reactins is reactions catalyzed by extracellular enzymes. This list should look like this:
+        [{"reaction":{
             "a":1,
             "b":-1,
             "c":1
         },
-        "kinetics": (lambda x,y: x*y,("a","b")),))}
-     
+        "kinetics": (lambda x,y: x*y,("a","b")),))},...]
+        Args:
+            name (str): A descriptive name for the environment
+            agents (Iterable): An iterable object like list or tuple including the collection of the agents to be used in the environment.
+            extracellular_reactions (Iterable): An iterable object consisting of a collection of extracellular reactions defined as above.
+            initial_condition (dict): A dictionary describing the initial concentration of all species in the environment to be used in the beginning
+            of each state
+            inlet_conditions (dict): A dictionary describing the inlet concentration of all species in the environment to be used in the beginning
+            of each state. This is important when simulating continuous bioreactors as the concentration of the inlet stream should be taken into account.
+            number_of_batches (int): Determines how many batches are performed in a simulation
+            dt (float): Specifies the time step for DFBA calculations
+            dilution_rate (float): The dilution rate of the bioreactor in per hour unit.
+            episodes_per_batch (int): Determines how many episodes should be executed with same actor function in parallel (policy evaluation)
+            episode_length (int): Determines how many time points exists within a given episode.
+            training (bool): Whether to run in training mode. If false, no training happens.
+            constant (list): A list of components that we want to hold their concentration constant during the simulations.
+        
+        Examples:
+            >>> from spamdfba import toymodels as tm
+            >>> from spamdfba import toolkit as tk
+            >>> agent1=tk.Agent("agent1",
+                model=tm.ToyModel_SA.copy(),
+                actor_network=tk.NN,
+                critic_network=tk.NN,
+                clip=0.1,
+                lr_actor=0.0001,
+                lr_critic=0.001,
+                grad_updates=4,
+                optimizer_actor=torch.optim.Adam,
+                optimizer_critic=torch.optim.Adam,
+                observables=['agent1','agent2' ,'Glc', 'Starch'],
+                actions=["Amylase_e"],
+                gamma=1,
+                tau=0.1
+                )
+            >>> agent2=tk.Agent("agent2",
+                model=tm.ToyModel_SA.copy(),
+                actor_network=tk.NN,
+                critic_network=tk.NN,
+                clip=0.1,
+                lr_actor=0.0001,
+                lr_critic=0.001,
+                grad_updates=4,
+                optimizer_actor=torch.optim.Adam,
+                optimizer_critic=torch.optim.Adam,
+                observables=['agent1','agent2', 'Glc', 'Starch'],
+                actions=["Amylase_e"],
+                gamma=1,
+                tau=0.1
+                )
+            >>> agents=[agent1,agent2]
+
+            >>> env=tk.Environment(name="Toy-Exoenzyme-Two-agents",
+                    agents=agents,
+                    dilution_rate=0.0001,
+                    initial_condition={"Glc":100,"agent1":0.1,"agent2":0.1,"Starch":10},
+                    inlet_conditions={"Starch":10},
+                    extracellular_reactions=[{"reaction":{
+                    "Glc":10,
+                    "Starch":-0.1,},
+                    "kinetics": (tk.general_kinetic,("Glc","Amylase"))}],
+                           dt=0.1,
+                           number_of_batches=1000,
+                           episodes_per_batch=int(NUM_CORES/2),
+                           )       
     """
     def __init__(self,
                 name:str,
-                agents:list,
-                extracellular_reactions:list[dict],
+                agents:Iterable,
+                extracellular_reactions:Iterable[dict],
                 initial_condition:dict,
                 inlet_conditions:dict,
-                batch_per_episode:int=1000,
                 number_of_batches:int=100,
                 dt:float=0.1,
                 dilution_rate:float=0.05,
@@ -87,7 +154,6 @@ class Environment:
         self.constant=constant
         self.episodes_per_batch=episodes_per_batch
         self.number_of_batches=number_of_batches
-        self.batch_per_episode = batch_per_episode
         self.dilution_rate = dilution_rate
         self.training=training
         self.mapping_matrix=self.resolve_exchanges()
@@ -114,7 +180,8 @@ class Environment:
 
     
     def resolve_exchanges(self)->dict:
-        """ Determines the exchange reaction mapping for the community."""
+        """ Determines the exchange reaction mapping for the community. This mapping is required to keep track of 
+        Metabolite pool change by relating exctacellular concentrations with production or consumption by the agents."""
         models=[agent.model for agent in self.agents]
         return Build_Mapping_Matrix(models)
     
@@ -124,8 +191,12 @@ class Environment:
         species.extend(self.mapping_matrix["Ex_sp"])
         return species
 
-    def resolve_extracellular_reactions(self,extracellular_reactions:list[dict])->list[dict]:
-        """ Determines the extracellular reactions for the community."""
+    def resolve_extracellular_reactions(self,extracellular_reactions:list[dict])->None:
+        """ Determines the extracellular reactions for the community. This method adds any new compounds required to run DFBA
+        to the system.
+        Args:
+            extracellular_reactions list[dict]: list of extracellular reactions as defined in the constructor.
+        """
         species=[]
         [species.extend(list(item["reaction"].keys())) for item in extracellular_reactions]
         new_species=[item for item in species if item not in self.species]
@@ -145,8 +216,12 @@ class Environment:
             "episode":[]
                         }
     
-    def step(self):
-        """ Performs a single step in the environment."""
+    def step(self)-> tuple(np.ndarray,list,list,np.ndarray):
+        """ Performs a single DFBA step in the environment.
+        This method provides similar interface as other RL libraries: It returns:
+        current state, rewards given to each agent from FBA calculations, actions each agent took,
+        and next state calculated similar to DFBA.
+        """
         self.temp_actions=[]
         self.state[self.state<0]=0
         dCdt = np.zeros(self.state.shape)
@@ -206,7 +281,7 @@ class Environment:
             agent.observables=[self.species.index(item) for item in agent.observables]
 
     def set_networks(self):
-        """ Sets the networks for the agents in the environment."""
+        """ Sets up the networks and optimizers for the agents in the environment."""
         if self.training==True:
             for agent in self.agents:
                 agent.actor_network_=agent.actor_network(len(agent.observables)+1,len(agent.actions))
@@ -446,8 +521,8 @@ class Simulation:
             "batch":[],
             "simulation":[]
         }            
-        if not os.path.exists(os.path.join(self.save_dir,self.env.name)):
-            os.makedirs(os.path.join(self.save_dir,self.env.name))
+        if not os.path.exists(os.path.join(self.save_dir,self.name)):
+            os.makedirs(os.path.join(self.save_dir,self.name))
             
         for agent in self.env.agents:
             agent.model.solver=solver
@@ -493,24 +568,24 @@ class Simulation:
 
                 if batch%self.save_every==0:
                     if self.overwrite:
-                        with open(os.path.join(self.save_dir,self.env.name,self.env.name+".pkl"), 'wb') as f:
+                        with open(os.path.join(self.save_dir,self.name,self.name+".pkl"), 'wb') as f:
                             pickle.dump(self.env, f)
-                        with open(os.path.join(self.save_dir,self.env.name,self.env.name+"_obs.pkl"), 'wb') as f:
+                        with open(os.path.join(self.save_dir,self.name,self.name+"_obs.pkl"), 'wb') as f:
                             pickle.dump(batch_obs,f)
-                        with open(os.path.join(self.save_dir,self.env.name,self.env.name+"_acts.pkl"), 'wb') as f:
+                        with open(os.path.join(self.save_dir,self.name,self.name+"_acts.pkl"), 'wb') as f:
                             pickle.dump(batch_acts,f)		
                     else:
-                        with open(os.path.join(self.save_dir,self.env.name,self.env.name+f"_{batch}"+".pkl"), 'wb') as f:
+                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}"+".pkl"), 'wb') as f:
                             pickle.dump(self.env, f)
-                        with open(os.path.join(self.save_dir,self.env.name,self.env.name+f"_{batch}"+"_obs.pkl"), 'wb') as f:
+                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}"+"_obs.pkl"), 'wb') as f:
                             pickle.dump(batch_obs,f)
-                        with open(os.path.join(self.save_dir,self.env.name,self.env.name+f"_{batch}"+"_acts.pkl"), 'wb') as f:
+                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}"+"_acts.pkl"), 'wb') as f:
                             pickle.dump(batch_acts,f)
 
-                if verbose:
-                    print(f"Batch {batch} finished:")
-                    for agent in self.env.agents:
-                        print(f"{agent.name} return was:  {np.mean(self.env.rewards[agent.name][-self.env.episodes_per_batch:])}")
+            if verbose:
+                print(f"Batch {batch} finished:")
+                for agent in self.env.agents:
+                    print(f"{agent.name} return was:  {np.mean(self.env.rewards[agent.name][-self.env.episodes_per_batch:])}")
 
         self.report["times"]["simulation"].append(time.time()-t_0_sim)
         
