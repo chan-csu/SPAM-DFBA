@@ -208,7 +208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="starch_amylase.html" class="md-nav__link">
+      <a href="Non" class="md-nav__link">
         Case Study - Starch Amylase
       </a>
     </li>
@@ -285,7 +285,9 @@
 <p>SPM-DFBA is an algoritm for inferring microbial interactions by modeling microbial metabolism in a community as a decision making process, a markov decision process more specifically, where individual agents learn metabolic regulation strategies that lead to their long-term survival by trying different strategies and improve their strategies according to proximal policy optimization algorithm.</p>
 <hr />
 <p><strong>Why reinforcement learning?</strong></p>
-<p>My main motivation for creating this framework was one of my favorite experiments in microbiology!</p>
+<p><img alt="DALLE" src="dalle.png" />
+(This image is created with DALL.E 3)</p>
+<p>The motivation for creating this framework was one of my favorite experiments in microbiology!</p>
 <p><a href="https://youtu.be/plVk4NVIUh8"><img alt="antibiotic" src="https://img.youtube.com/vi/plVk4NVIUh8/0.jpg" /></a></p>
 <p>How can we predict such behaviors by relying only on genotype of the cells and minimal phenotypic data? The answer is not very strightforward and here is why:</p>
 <p>Flux balance analysis(FBA) is a commonly-used approach in system biology to determine the rate of each biochemical reaction within the cell. In this approach the cells are modeled as constant-volume bioreactors and they can exchange metabolites to the outside. Writing mass balance equations across this "bioreactor" results in a system of ordinary differential equtions(ODEs) that describes the concentration profiles in the reactor over time. The issue with solving such system of ODEs is that we need the kinetic expression and the kinetic parameters for every reaction in this system. This is currently near impossible to do! Flux balance analysis deals with this problem by making a simplifying, yet somewhat realistic, assumption that the internal flux of the cells change much faster than the changes in the environment and the cells can achieve a state of homeostasis. This means that we can assume that the systems is at steady state and we can convert the system of ODE into a system of equations. However, mass balance itself is not enough to solve this system of linear equations. For a genome-scale metabolic model, we have more unknowns than equations. To solve this system of equations, we need to make another assumption. The most common assumption is that the cells are in a state of maximum growth rate. with this assumption we can turn the system of equations into a linear programming problem and solve it to find the fluxes.</p>
