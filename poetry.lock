@@ -473,6 +473,14 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "kaleido"
+version = "0.2.1.post1"
+description = "Static image export for web-based visualization libraries with zero dependencies"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
@@ -1056,7 +1064,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "e35b80ea122631f04c39c3cabe5bfca89179176900561755515b3e1249b845e3"
+content-hash = "26adaa294517c0248bb65e28a9cf0c1510c5d5e82dd237658f703c079a751867"
 
 [metadata.files]
 aiosignal = []
@@ -1098,6 +1106,7 @@ jinja2 = [
 jsonschema = []
 jsonschema-specifications = []
 jupyterlab-widgets = []
+kaleido = []
 markdown-it-py = []
 markupsafe = []
 matplotlib-inline = []

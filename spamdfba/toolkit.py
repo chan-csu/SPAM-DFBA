@@ -54,6 +54,124 @@ class NN(nn.Module):
         out=self.output(out)
         return out
 
+class Agent:
+    """ An object of this class defines an agent in the environment. At the core of an agent lies a COBRA model.
+        Also the observable environment states are needed to be defined for an agent. Additionally, it should be defined what 
+        reactions an agent have control over.
+        
+
+        Args:
+            name (str): A descriptive name given to an agent.
+            model (cobra.Model): A cobra model describing the metabolism of the agent.
+            actor_network (NN): The neural network class, pyTorch, to be used for the actor network.
+            critic_network (NN): The neural network class, pyTorch, to be used for the critic network.
+            optimizer_critic (torch.optim.Adam): The Adam optimizer class used for tuning the critic network parameters.
+            optimizer_actor (torch.optim.Adam): The Adam optimizer class used for tuning the actor network parameters.
+            actions (list): list of reaction names that the agent has control over. The reactions should exist in the cobra model.
+            observables (list): list of the names of metabolites that the agents can sense from the environment.
+            clip (float): gradient clipping threshhold that is used in PPO algorithm
+            actor_var (float): Amount of variance in the actor network suggestions. For exploration purpose. 
+            grad_updates (int): How many steps of gradient decent is performed in each training step
+            lr_actor (float) : The learning rate for the actor network 
+            lr_critic (float) : The learning rate for the critic network 
+        
+        Examples:
+            >>> from spamdfba import toymodels as tm
+            >>> from spamdfba import toolkit as tk
+            >>> agent1=tk.Agent("agent1",
+                model=tm.ToyModel_SA.copy(),
+                actor_network=tk.NN,
+                critic_network=tk.NN,
+                clip=0.1,
+                lr_actor=0.0001,
+                lr_critic=0.001,
+                grad_updates=4,
+                optimizer_actor=torch.optim.Adam,
+                optimizer_critic=torch.optim.Adam,
+                observables=['agent1','agent2' ,'Glc', 'Starch'],
+                actions=["Amylase_e"],
+                gamma=1,
+                )
+    """
+    def __init__(self,
+                name:str,
+                model:cobra.Model,
+                actor_network:NN,
+                critic_network:NN,
+                optimizer_critic:torch.optim.Adam,
+                optimizer_actor:torch.optim.Adam,
+                actions:list[str],
+                observables:list[str],
+                gamma:float,
+                clip:float=0.01,
+                actor_var:float=0.1,
+                grad_updates:int=1,
+                lr_actor:float=0.001,
+                lr_critic:float=0.001,
+                ) -> None:
+
+        self.name = name
+        self.model = model
+        self.optimizer_critic = optimizer_critic
+        self.optimizer_actor = optimizer_actor
+        self.gamma = gamma
+        self.observables = observables
+        self.actions = [self.model.reactions.index(item) for item in actions]
+        self.observables = observables
+        self.general_uptake_kinetics=general_uptake
+        self.clip = clip
+        self.actor_var = actor_var
+        self.lr_actor = lr_actor
+        self.lr_critic = lr_critic
+        self.grad_updates = grad_updates
+        self.actor_network = actor_network
+        self.critic_network = critic_network
+        self.cov_var = torch.full(size=(len(self.actions),), fill_value=0.1)
+        self.cov_mat = torch.diag(self.cov_var)
+   
+    def get_actions(self,observation:np.ndarray):
+        """ 
+        This method will draw the actions from a normal distribution around the actor netwrok prediction.
+        The derivatives are not calculated here.
+        """
+        mean = self.actor_network_(torch.tensor(observation, dtype=torch.float32)).detach()
+        # dist = MultivariateNormal(mean, self.actor_var)(mean, self.cov_mat)
+        dist = Normal(mean, self.actor_var)
+        action = dist.sample()
+        log_prob =torch.sum(dist.log_prob(action))        # log_prob = dist.log_prob(action)
+        return action.detach().numpy(), log_prob
+   
+    def evaluate(self, batch_obs:np.ndarray ,batch_acts:np.ndarray):
+        """ 
+        Calculates the value of the states, as well as the log probability af the actions that are taken.
+        The derivatives are calculated here.
+        """
+        V = self.critic_network_(batch_obs).squeeze()
+        mean = self.actor_network_(batch_obs)
+        # dist = MultivariateNormal(mean, self.cov_mat)
+        dist = Normal(mean, self.actor_var)
+        log_probs = torch.sum(dist.log_prob(batch_acts),dim=1)
+
+        return V, log_probs 
+    
+    def compute_rtgs(self, batch_rews:list):
+        """Given a batch of rewards , it calculates the discouted return for each state for that batch"""
+
+        batch_rtgs = []
+
+        for ep_rews in reversed(batch_rews):
+            discounted_reward = 0 # The discounted reward so far
+            for rew in reversed(ep_rews):
+                discounted_reward = rew + discounted_reward * self.gamma
+                batch_rtgs.insert(0, discounted_reward)
+
+		# Convert the rewards-to-go into a tensor
+        batch_rtgs = torch.tensor(batch_rtgs, dtype=torch.float)
+
+        return batch_rtgs
+
+
+
 class Environment:
     """ An environment is a collection of the following:
         Agents: a list of objects of class Agent, defined below.
@@ -65,6 +183,7 @@ class Environment:
             "c":1
         },
         "kinetics": (lambda x,y: x*y,("a","b")),))},...]
+        
         Args:
             name (str): A descriptive name for the environment
             agents (Iterable): An iterable object like list or tuple including the collection of the agents to be used in the environment.
@@ -97,7 +216,6 @@ class Environment:
                 observables=['agent1','agent2' ,'Glc', 'Starch'],
                 actions=["Amylase_e"],
                 gamma=1,
-                tau=0.1
                 )
             >>> agent2=tk.Agent("agent2",
                 model=tm.ToyModel_SA.copy(),
@@ -112,7 +230,6 @@ class Environment:
                 observables=['agent1','agent2', 'Glc', 'Starch'],
                 actions=["Amylase_e"],
                 gamma=1,
-                tau=0.1
                 )
             >>> agents=[agent1,agent2]
 
@@ -216,7 +333,7 @@ class Environment:
             "episode":[]
                         }
     
-    def step(self)-> tuple(np.ndarray,list,list,np.ndarray):
+    def step(self)-> tuple[np.ndarray,list,list,np.ndarray]:
         """ Performs a single DFBA step in the environment.
         This method provides similar interface as other RL libraries: It returns:
         current state, rewards given to each agent from FBA calculations, actions each agent took,
@@ -289,88 +406,6 @@ class Environment:
                 agent.optimizer_value_ = agent.optimizer_critic(agent.critic_network_.parameters(), lr=agent.lr_critic)
                 agent.optimizer_policy_ = agent.optimizer_actor(agent.actor_network_.parameters(), lr=agent.lr_actor)
     
-class Agent:
-    """ Any microbial agent will be an instance of this class.
-    """
-    def __init__(self,
-                name:str,
-                model:cobra.Model,
-                actor_network:NN,
-                critic_network:NN,
-                optimizer_critic:torch.optim.Adam,
-                optimizer_actor:torch.optim.Adam,
-                actions:list[str],
-                observables:list[str],
-                gamma:float,
-                clip:float=0.01,
-                actor_var:float=0.1,
-                grad_updates:int=1,
-                epsilon:float=0.01,
-                lr_actor:float=0.001,
-                lr_critic:float=0.001,
-                buffer_sample_size:int=500,
-                tau:float=0.001,
-                alpha:float=0.001) -> None:
-
-        self.name = name
-        self.model = model
-        self.optimizer_critic = optimizer_critic
-        self.optimizer_actor = optimizer_actor
-        self.gamma = gamma
-        self.observables = observables
-        self.actions = [self.model.reactions.index(item) for item in actions]
-        self.observables = observables
-        self.epsilon = epsilon
-        self.general_uptake_kinetics=general_uptake
-        self.tau = tau
-        self.clip = clip
-        self.actor_var = actor_var
-        self.lr_actor = lr_actor
-        self.lr_critic = lr_critic
-        self.buffer_sample_size = buffer_sample_size
-        self.R=0
-        self.grad_updates = grad_updates
-        self.alpha = alpha
-        self.actor_network = actor_network
-        self.critic_network = critic_network
-        self.cov_var = torch.full(size=(len(self.actions),), fill_value=0.1)
-        self.cov_mat = torch.diag(self.cov_var)
-   
-    def get_actions(self,observation:np.ndarray):
-        """ 
-        Gets the actions and their probabilities for the agent.
-        """
-        mean = self.actor_network_(torch.tensor(observation, dtype=torch.float32)).detach()
-        # dist = MultivariateNormal(mean, self.actor_var)(mean, self.cov_mat)
-        dist = Normal(mean, self.actor_var)
-        action = dist.sample()
-        log_prob =torch.sum(dist.log_prob(action))        # log_prob = dist.log_prob(action)
-        return action.detach().numpy(), log_prob
-   
-    def evaluate(self, batch_obs,batch_acts):
-        V = self.critic_network_(batch_obs).squeeze()
-        mean = self.actor_network_(batch_obs)
-        # dist = MultivariateNormal(mean, self.cov_mat)
-        dist = Normal(mean, self.actor_var)
-        log_probs = torch.sum(dist.log_prob(batch_acts),dim=1)
-
-        return V, log_probs 
-    
-    def compute_rtgs(self, batch_rews):
-
-        batch_rtgs = []
-
-        for ep_rews in reversed(batch_rews):
-            discounted_reward = 0 # The discounted reward so far
-            for rew in reversed(ep_rews):
-                discounted_reward = rew + discounted_reward * self.gamma
-                batch_rtgs.insert(0, discounted_reward)
-
-		# Convert the rewards-to-go into a tensor
-        batch_rtgs = torch.tensor(batch_rtgs, dtype=torch.float)
-
-        return batch_rtgs
-
 
         
 def Build_Mapping_Matrix(models:list[cobra.Model])->dict:
@@ -392,15 +427,22 @@ def Build_Mapping_Matrix(models:list[cobra.Model])->dict:
 
 
 
-def general_kinetic(x,y):
+def general_kinetic(x:float,y:float)->float:
+    """A simple function implementing MM kinetics """
     return 0.1*x*y/(10+x)
-def general_uptake(c):
+def general_uptake(c:float)->float:
+    """An extremely simple function for mass transfer kinetic. Only used for testing """
     return 10*(c/(c+10))
 
-def mass_transfer(x,y):
-    return 0.01*(x-y)
+def mass_transfer(x:float,y:float,k:float=0.01)->float:
+    """A simple function for mass transfer kinetic """
+    return k*(x-y)
 
-def rollout(env):
+def rollout(env:Environment)->tuple:
+    """Performs a batch calculation in parallel using Ray library.
+    Args:
+        env (Environment): The environment instance to run the episodes for
+    """
     t0_batch=time.time()
     batch_obs={key.name:[] for key in env.agents}
     batch_acts={key.name:[] for key in env.agents}
@@ -442,8 +484,9 @@ def rollout(env):
     return batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env.rewards.copy()
 
 @ray.remote
-def run_episode(env):
-    """ Runs a single episode of the environment. """
+def run_episode(env:Environment)->tuple:
+    """ Runs a single episode of the environment used for parallel computatuon of episodes.
+    """
     t_0_ep=time.time()
     batch_obs = {key.name:[] for key in env.agents}
     batch_acts = {key.name:[] for key in env.agents}
@@ -471,7 +514,7 @@ def run_episode(env):
     return batch_obs,batch_acts, batch_log_probs, episode_rews,env.time_dict,env.rewards
 
 def run_episode_single(env):
-    """ Runs a single episode of the environment. """
+    """ Runs a single episode of the environment."""
     batch_obs = {key.name:[] for key in env.agents}
     batch_acts = {key.name:[] for key in env.agents}
     batch_log_probs = {key.name:[] for key in env.agents}
@@ -495,12 +538,18 @@ def run_episode_single(env):
 
 
 class Simulation:
-    """This class is designed to run the final simulation for an environment and takes care of:
+    """This class is designed to run the final simulation for an environment and additionaly does:
         - Saving the results given a specific interval
         - Plotting the results 
-        This class can be extended later for added functionalities such as streaming the training results.
+        - calculating the duration of different parts of the code.
+        This class can be extended easily later for added functionalities such as online streaming the training results.
         
         Args:
+            name (str): A descriptive name given to the simulation. This name is used to save the training files.
+            env (environment): The environment to perform the simulations in. 
+            save_dir (str): The DIRECTORY to which you want to save the training results
+            overwrite (bool): Determines whether to overwrite the pickel in each saving interval create new files
+            report (dict): Includes the reported time at each step
     """
     
     def __init__(self,name:str,env:Environment,save_dir:str,save_every:int=200,overwrite:bool=False):
@@ -513,6 +562,18 @@ class Simulation:
         
     
     def run(self,solver:str="glpk",verbose:bool=True,initial_critic_error:float=100)->Environment:
+        """This method runs the training loop
+        
+        Args:
+            solver (str): The solver to be used by cobrapy
+            verbose (bool): whether to print the training results after each iteration
+            initial_critic_error (float): To make the training faster this method first trains the critic network on the first batch of episodes to
+            make the critic network produce more realistic values in the beginning. This parameter defines what is the allowable MSE of the critic network
+            on the first batch of data obtained from the evironment
+        Returns:
+            Environment: The trained version of the environment.
+            
+            """
         t_0_sim=time.time()
         self.report={"returns":{ag.name:[] for ag in self.env.agents}}
         self.report["times"]={
@@ -589,7 +650,15 @@ class Simulation:
 
         self.report["times"]["simulation"].append(time.time()-t_0_sim)
         
-    def plot_learning_curves(self,plot:bool=True):
+    def plot_learning_curves(self,plot:bool=True)->go.Figure:
+        """
+        This method plots the learning curve for all the agents.
+        Args:
+            plot (bool): whether to render the plot as well 
+        
+        Returns:
+            go.Figure : Returns a plotly figure for learning curves of the agents.
+        """
         fig = go.Figure()
         for index,agent in enumerate(self.env.agents):
             rets=pd.DataFrame(self.report["returns"][agent.name])
@@ -623,7 +692,16 @@ class Simulation:
             fig.show()
         return fig
             
-    def print_training_times(self,draw_table:bool=True):
+    def print_training_times(self,draw_table:bool=True)->list[dict]:
+        """Returns a dictionary describing the simulation time at different level of the training process. You can also opt to draw a table based on this results 
+        using Rich library.
+        
+        Args:
+            draw_table (bool): whether to draw the table in the console
+            
+        Returns:
+            dict: A list of dictionaries that contain duration of execution for different stages of simulation 
+        """
         report_times=pd.concat([pd.DataFrame.from_dict(self.report["times"],orient='index').fillna(method="ffill",axis=1).mean(axis=1),pd.DataFrame.from_dict(self.report["times"],orient='index').fillna(method="ffill",axis=1).std(axis=1)],axis=1).rename({0:"mean",1:"std"},axis=1).to_dict(orient="record")
         if draw_table:
             table = Table(title="Simulation times")
@@ -636,4 +714,5 @@ class Simulation:
             table.add_row("Simulation",str(report_times[3]["mean"]),"NA")
             console = Console()
             console.print(table)
+        return report_times
     

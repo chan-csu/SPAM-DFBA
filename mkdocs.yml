@@ -1,0 +1,16 @@
+site_name: SPAM-DFBA
+
+theme:
+  name: "material"
+
+plugins:
+  - mkdocstrings
+
+nav:
+  - Main : index.md
+  - Installation : Installation.md
+  - API : API.md
+  - Case Study - Starch Amylase : case_studies_Starch_Amylase.html
+  - Case Study - Toy NECom : starch_amylase.html
+  - Case Study - Ecoli GEMM : starch_amylase.html
+
