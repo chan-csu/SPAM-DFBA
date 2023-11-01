@@ -1,7 +1,4 @@
 # SPAM-DFBA Documentation Website
-# SPM-DFBA
-
-Parsa Ghadermazi: Parsa.ghadermazi@colostate.edu
 
 SPM-DFBA is an algoritm for inferring microbial interactions by modeling microbial metabolism in a community as a decision making process, a markov decision process more specifically, where individual agents learn metabolic regulation strategies that lead to their long-term survival by trying different strategies and improve their strategies according to proximal policy optimization algorithm.
 

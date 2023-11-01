@@ -525,3 +525,8 @@ Toy_Model_NE_Mut_2.exchange_reactions=tuple([Toy_Model_NE_Mut_2.reactions.index(
 
 ```
 
+## Scalability
+
+Although SPAM-DFBA needs a large number of simulations for learning purpose, the simulation times scale linearly with the number of agents that are added. A survey on single, two, and five agent environment for starch-amylase case, see "Case Study - Starch Amylase", revealed this aspect which is shown below:
+
+![runtime](./runtime.png)
