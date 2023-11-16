@@ -1,12 +1,8 @@
-# SPAM-DFBA Documentation Website
-
-Parsa Ghadermazi: Parsa.ghadermazi@colostate.edu
-
 # SPAM-DFBA
 
 ## Introduction
 
-SPM-DFBA is an algoritm for inferring microbial interactions by modeling microbial metabolism in a community as a decision making process, a markov decision process more specifically, where individual agents learn metabolic regulation strategies that lead to their long-term survival by trying different strategies and improve their strategies according to proximal policy optimization algorithm.
+SPAM-DFBA is an algoritm for inferring microbial interactions by modeling microbial metabolism in a community as a decision making process, a markov decision process more specifically, where individual agents learn metabolic regulation strategies that lead to their long-term survival by trying different strategies and improve their strategies according to proximal policy optimization algorithm.
 
 ***More information can be found in the documentation website for this project:***
 
@@ -34,7 +30,6 @@ pip install spamdfba
 
 The examples used in the manuscript are provided in separated jupyter notebooks in the ./examples directory. Additionally, they are provided in the documentation website for this project under Case Study-* section
 
-During training, different objects are saved into pickle files whick are also provided in ./examples/Results/ for each environment.
 
 ## Contribution
 
