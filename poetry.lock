@@ -217,6 +217,17 @@ python-versions = "*"
 tests = ["asttokens (>=2.1.0)", "ipython", "pytest", "coverage", "coverage-enable-subprocess", "littleutils", "rich"]
 
 [[package]]
+name = "fastjsonschema"
+version = "2.19.0"
+description = "Fastest Python implementation of JSON schema"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+devel = ["colorama", "jsonschema", "json-spec", "pylint", "pytest", "pytest-benchmark", "pytest-cache", "validictory"]
+
+[[package]]
 name = "filelock"
 version = "3.12.4"
 description = "A platform independent file lock."
@@ -457,6 +468,23 @@ python-versions = ">=3.8"
 referencing = ">=0.28.0"
 
 [[package]]
+name = "jupyter-core"
+version = "5.5.1"
+description = "Jupyter core package. A base package on which Jupyter projects rely."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+platformdirs = ">=2.5"
+pywin32 = {version = ">=300", markers = "sys_platform == \"win32\" and platform_python_implementation != \"PyPy\""}
+traitlets = ">=5.3"
+
+[package.extras]
+docs = ["traitlets", "myst-parser", "pydata-sphinx-theme", "sphinx-autodoc-typehints", "sphinxcontrib-github-alt", "sphinxcontrib-spelling"]
+test = ["ipykernel", "pre-commit", "pytest", "pytest-cov", "pytest-timeout"]
+
+[[package]]
 name = "jupyterlab-widgets"
 version = "3.0.9"
 description = "Jupyter interactive widgets for JupyterLab"
@@ -549,6 +577,24 @@ description = "MessagePack serializer"
 category = "main"
 optional = false
 python-versions = ">=3.8"
+
+[[package]]
+name = "nbformat"
+version = "5.9.2"
+description = "The Jupyter Notebook format"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+fastjsonschema = "*"
+jsonschema = ">=2.6"
+jupyter-core = "*"
+traitlets = ">=5.1"
+
+[package.extras]
+docs = ["myst-parser", "pydata-sphinx-theme", "sphinx", "sphinxcontrib-github-alt", "sphinxcontrib-spelling"]
+test = ["pep440", "pre-commit", "pytest", "testpath"]
 
 [[package]]
 name = "networkx"
@@ -646,6 +692,18 @@ description = "Tiny 'shelve'-like database with concurrency support"
 category = "main"
 optional = false
 python-versions = "*"
+
+[[package]]
+name = "platformdirs"
+version = "4.1.0"
+description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.extras]
+docs = ["furo (>=2023.7.26)", "proselint (>=0.13)", "sphinx-autodoc-typehints (>=1.24)", "sphinx (>=7.1.1)"]
+test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest-cov (>=4.1)", "pytest-mock (>=3.11.1)", "pytest (>=7.4)"]
 
 [[package]]
 name = "plotly"
@@ -792,6 +850,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "pywin32"
+version = "306"
+description = "Python for Window Extensions"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "pyyaml"
 version = "6.0.1"
 description = "YAML parser and emitter for Python"
@@ -909,6 +975,22 @@ description = "C version of reader, parser and emitter for ruamel.yaml derived f
 category = "main"
 optional = false
 python-versions = ">=3.6"
+
+[[package]]
+name = "scipy"
+version = "1.11.4"
+description = "Fundamental algorithms for scientific computing in Python"
+category = "main"
+optional = false
+python-versions = ">=3.9"
+
+[package.dependencies]
+numpy = ">=1.21.6,<1.28.0"
+
+[package.extras]
+test = ["pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "asv", "mpmath", "gmpy2", "threadpoolctl", "scikit-umfpack", "pooch"]
+doc = ["sphinx (!=4.1.0)", "pydata-sphinx-theme (==0.9.0)", "sphinx-design (>=0.2.0)", "matplotlib (>2)", "numpydoc", "jupytext", "myst-nb", "pooch"]
+dev = ["mypy", "typing-extensions", "types-psutil", "pycodestyle", "ruff", "cython-lint (>=0.12.2)", "rich-click", "click", "doit (>=0.36.0)", "pydevtool"]
 
 [[package]]
 name = "six"
@@ -1044,7 +1126,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "6bd919930947a33f3f228171ad88e2c131703c746a912685bf7f264155601f06"
+content-hash = "5b032b0053f59bc88764ae612ff6059237da5c0e19ec15754e12f0b423d1d5ce"
 
 [metadata.files]
 aiosignal = []
@@ -1066,6 +1148,7 @@ depinfo = []
 diskcache = []
 exceptiongroup = []
 executing = []
+fastjsonschema = []
 filelock = []
 frozenlist = []
 fsspec = []
@@ -1084,6 +1167,7 @@ jinja2 = [
 ]
 jsonschema = []
 jsonschema-specifications = []
+jupyter-core = []
 jupyterlab-widgets = []
 kaleido = []
 markdown-it-py = []
@@ -1093,6 +1177,7 @@ mdurl = []
 more-itertools = []
 mpmath = []
 msgpack = []
+nbformat = []
 networkx = []
 numpy = []
 optlang = []
@@ -1101,6 +1186,7 @@ pandas = []
 parso = []
 pexpect = []
 pickleshare = []
+platformdirs = []
 plotly = []
 pluggy = [
     {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
@@ -1126,6 +1212,7 @@ python-dateutil = [
 ]
 python-libsbml = []
 pytz = []
+pywin32 = []
 pyyaml = []
 ray = []
 referencing = []
@@ -1134,6 +1221,7 @@ rich = []
 rpds-py = []
 "ruamel.yaml" = []
 "ruamel.yaml.clib" = []
+scipy = []
 six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},

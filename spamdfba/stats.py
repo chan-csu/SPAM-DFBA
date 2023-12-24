@@ -2,7 +2,6 @@
 import numpy as np 
 import pandas as pd
 import pickle
-from toolkit import Environment
 import plotly.express as px
 import scipy.stats as stats
 
@@ -28,7 +27,7 @@ class StatResult:
         self.std2 = np.std(vec2)
         
     
-    def box_plot(self)->None:
+    def box_plot(self, plot:bool=True)->None:
         """
         A simple box plot visualization of the two vectors of observations.
         """
@@ -38,9 +37,11 @@ class StatResult:
         })
         df=pd.melt(df,value_vars=['obs1','obs2'])
         fig=px.box(df,x='variable',y='value',color='variable')
-        fig.show()
+        if plot:
+            fig.show()
+        return fig
     
-    def anova(self)->stats.AnovaResults:
+    def anova(self):
         """
         Performs one-way ANOVA test on the two vectors of observations.
         """
@@ -67,7 +68,6 @@ def compare_observations(
                         compounds: list[int],
                         on_index: int,
                         agent:str='agent1',
-                        env:Environment|None=None,
                         )-> list[StatResult]:
     """Performs statistical analysis of two batches of observations.
     Args:

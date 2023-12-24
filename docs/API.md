@@ -524,6 +524,9 @@ Toy_Model_NE_Mut_2.biomass_ind=9
 Toy_Model_NE_Mut_2.exchange_reactions=tuple([Toy_Model_NE_Mut_2.reactions.index(i) for i in Toy_Model_NE_Mut_2.exchanges])
 
 ```
+## Stats
+
+::: spamdfba.stats
 
 ## Scalability
 
