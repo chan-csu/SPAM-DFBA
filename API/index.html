@@ -426,6 +426,54 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    Stats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spamdfba.stats" class="md-nav__link">
+    spamdfba.stats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spamdfba.stats.StatResult" class="md-nav__link">
+    StatResult
+  </a>
+  
+    <nav class="md-nav" aria-label="StatResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spamdfba.stats.StatResult.anova" class="md-nav__link">
+    anova()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spamdfba.stats.StatResult.box_plot" class="md-nav__link">
+    box_plot()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spamdfba.stats.compare_observations" class="md-nav__link">
+    compare_observations()
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scalability" class="md-nav__link">
     Scalability
   </a>
@@ -480,6 +528,21 @@
     <li class="md-nav__item">
       <a href="../case_studies_ecoli_GEM.html" class="md-nav__link">
         Case Study - Ecoli GEM
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stats.html" class="md-nav__link">
+        Statistical Analysis
       </a>
     </li>
   
@@ -714,6 +777,54 @@
         <li class="md-nav__item">
   <a href="#toymodel" class="md-nav__link">
     toymodel
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    Stats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spamdfba.stats" class="md-nav__link">
+    spamdfba.stats
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spamdfba.stats.StatResult" class="md-nav__link">
+    StatResult
+  </a>
+  
+    <nav class="md-nav" aria-label="StatResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spamdfba.stats.StatResult.anova" class="md-nav__link">
+    anova()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spamdfba.stats.StatResult.box_plot" class="md-nav__link">
+    box_plot()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spamdfba.stats.compare_observations" class="md-nav__link">
+    compare_observations()
   </a>
   
 </li>
@@ -4469,7 +4580,472 @@ Toy_Model_NE_Mut_2.biomass_ind=9
 Toy_Model_NE_Mut_2.exchange_reactions=tuple([Toy_Model_NE_Mut_2.reactions.index(i) for i in Toy_Model_NE_Mut_2.exchanges])
 
 </code></pre>
-<h2 id="scalability">Scalability</h2>
+<h2 id="stats">Stats</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+<a id="spamdfba.stats"></a>
+  <div class="doc doc-contents first">
+  
+      <p>This module is designed for statistical analysis of the simulation results.</p>
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="spamdfba.stats.StatResult" class="doc doc-heading">
+        <code>StatResult</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents ">
+
+  
+      <p>This class is designed for presenting the results of statistical analyses offered by this, stats, module.
+Two vectors of observations are required to be compared. They can vary in size but it would be strange if this 
+is the case with SPAM-DFBA simulations.</p>
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>vec1</code></td>
+          <td>
+                <code><span title="numpy">np</span>.<span title="numpy.ndarray">ndarray</span></code>
+          </td>
+          <td><p>First vector of observations.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>vec2</code></td>
+          <td>
+                <code><span title="numpy">np</span>.<span title="numpy.ndarray">ndarray</span></code>
+          </td>
+          <td><p>Second vector of observations.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>names</code></td>
+          <td>
+                <code>list[str]</code>
+          </td>
+          <td><p>Names of the two vectors in the same order as they are passed as vec1 and vec2.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+        <details class="quote">
+          <summary>Source code in <code>spamdfba/stats.py</code></summary>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">StatResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class is designed for presenting the results of statistical analyses offered by this, stats, module.</span>
+<span class="sd">    Two vectors of observations are required to be compared. They can vary in size but it would be strange if this </span>
+<span class="sd">    is the case with SPAM-DFBA simulations.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vec1 (np.ndarray): First vector of observations.</span>
+<span class="sd">        vec2 (np.ndarray): Second vector of observations.</span>
+<span class="sd">        names (list[str]): Names of the two vectors in the same order as they are passed as vec1 and vec2.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vec1</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span><span class="n">vec2</span><span class="p">:</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vec1</span> <span class="o">=</span> <span class="n">vec1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vec2</span> <span class="o">=</span> <span class="n">vec2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mean1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">vec1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mean2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">vec2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">std1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">vec1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">std2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">vec2</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">box_plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">plot</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A simple box plot visualization of the two vectors of observations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">df</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="bp">self</span><span class="o">.</span><span class="n">vec1</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span><span class="bp">self</span><span class="o">.</span><span class="n">vec2</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">df</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">melt</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">value_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;obs1&#39;</span><span class="p">,</span><span class="s1">&#39;obs2&#39;</span><span class="p">])</span>
+        <span class="n">fig</span><span class="o">=</span><span class="n">px</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;value&#39;</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+            <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">fig</span>
+
+    <span class="k">def</span> <span class="nf">anova</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Performs one-way ANOVA test on the two vectors of observations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">stats</span><span class="o">.</span><span class="n">f_oneway</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vec1</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">vec2</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">ares</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">anova</span><span class="p">()</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+
+<span class="s2">    mean1:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mean1</span><span class="si">}</span>
+<span class="s2">    mean2:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mean2</span><span class="si">}</span>
+<span class="s2">    std1:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">std1</span><span class="si">}</span>
+<span class="s2">    std2:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">std2</span><span class="si">}</span>
+<span class="s2">    -------------------</span>
+<span class="s2">    ANOVA: statistic=</span><span class="si">{</span><span class="n">ares</span><span class="o">.</span><span class="n">statistic</span><span class="si">}</span><span class="s2">, pvalue=</span><span class="si">{</span><span class="n">ares</span><span class="o">.</span><span class="n">pvalue</span><span class="si">}</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+</code></pre></div></td></tr></table></div>
+        </details>
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<h3 id="spamdfba.stats.StatResult.anova" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">anova</span><span class="p">()</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Performs one-way ANOVA test on the two vectors of observations.</p>
+
+      <details class="quote">
+        <summary>Source code in <code>spamdfba/stats.py</code></summary>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">anova</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs one-way ANOVA test on the two vectors of observations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">stats</span><span class="o">.</span><span class="n">f_oneway</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vec1</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">vec2</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+      </details>
+  </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+
+<h3 id="spamdfba.stats.StatResult.box_plot" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">box_plot</span><span class="p">(</span><span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>A simple box plot visualization of the two vectors of observations.</p>
+
+      <details class="quote">
+        <summary>Source code in <code>spamdfba/stats.py</code></summary>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">box_plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">plot</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">-&gt;</span><span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A simple box plot visualization of the two vectors of observations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">df</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span><span class="bp">self</span><span class="o">.</span><span class="n">vec1</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span><span class="bp">self</span><span class="o">.</span><span class="n">vec2</span><span class="p">,</span>
+    <span class="p">})</span>
+    <span class="n">df</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">melt</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">value_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;obs1&#39;</span><span class="p">,</span><span class="s1">&#39;obs2&#39;</span><span class="p">])</span>
+    <span class="n">fig</span><span class="o">=</span><span class="n">px</span><span class="o">.</span><span class="n">box</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;value&#39;</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;variable&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">fig</span>
+</code></pre></div></td></tr></table></div>
+      </details>
+  </div>
+
+</div>
+
+
+
+  </div>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<h2 id="spamdfba.stats.compare_observations" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">compare_observations</span><span class="p">(</span><span class="n">obs1</span><span class="p">,</span> <span class="n">obs2</span><span class="p">,</span> <span class="n">compounds</span><span class="p">,</span> <span class="n">on_index</span><span class="p">,</span> <span class="n">agent</span><span class="o">=</span><span class="s1">&#39;agent1&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Performs statistical analysis of two batches of observations.</p>
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>obs1</code></td>
+          <td>
+                <code><span title="numpy">np</span>.<span title="numpy.ndarray">ndarray</span></code>
+          </td>
+          <td><p>address of the first batch of observations save as .pkl file.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>obs2</code></td>
+          <td>
+                <code><span title="numpy">np</span>.<span title="numpy.ndarray">ndarray</span></code>
+          </td>
+          <td><p>address of the second batch of observations save as .pkl file.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>compounds</code></td>
+          <td>
+                <code>list[int]</code>
+          </td>
+          <td><p>List of compounds to compare.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>on_index</code></td>
+          <td>
+                <code>int</code>
+          </td>
+          <td><p>Index of the compound to compare.</p></td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td>
+                <code><a class="autorefs autorefs-internal" title="spamdfba.stats.StatResult" href="#spamdfba.stats.StatResult">StatResult</a></code>
+          </td>
+          <td><p>Statistical analysis results represented as a StatResult object.</p></td>
+        </tr>
+    </tbody>
+  </table>
+
+      <details class="quote">
+        <summary>Source code in <code>spamdfba/stats.py</code></summary>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">compare_observations</span><span class="p">(</span>
+                        <span class="n">obs1</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                        <span class="n">obs2</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                        <span class="n">compounds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+                        <span class="n">on_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                        <span class="n">agent</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;agent1&#39;</span><span class="p">,</span>
+                        <span class="p">)</span><span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">StatResult</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Performs statistical analysis of two batches of observations.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        obs1: address of the first batch of observations save as .pkl file.</span>
+<span class="sd">        obs2: address of the second batch of observations save as .pkl file.</span>
+<span class="sd">        compounds: List of compounds to compare.</span>
+<span class="sd">        on_index: Index of the compound to compare.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        (StatResult): Statistical analysis results represented as a StatResult object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">obs1</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">obs1</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">obs2</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">obs2</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+
+    <span class="n">results</span><span class="o">=</span><span class="p">[]</span>
+    <span class="n">obs1</span><span class="o">=</span><span class="n">obs1</span><span class="p">[</span><span class="n">agent</span><span class="p">]</span>
+    <span class="n">obs2</span><span class="o">=</span><span class="n">obs2</span><span class="p">[</span><span class="n">agent</span><span class="p">]</span>
+    <span class="n">obs1</span><span class="o">=</span><span class="n">obs1</span><span class="p">[:,</span><span class="n">compounds</span><span class="p">]</span>
+    <span class="n">obs2</span><span class="o">=</span><span class="n">obs2</span><span class="p">[:,</span><span class="n">compounds</span><span class="p">]</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">compounds</span><span class="p">)):</span>
+        <span class="n">temp1</span><span class="o">=</span><span class="n">obs1</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()[</span><span class="n">on_index</span><span class="p">,:]</span>
+        <span class="n">temp2</span><span class="o">=</span><span class="n">obs2</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()[</span><span class="n">on_index</span><span class="p">,:]</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">StatResult</span><span class="p">(</span><span class="n">temp1</span><span class="p">,</span><span class="n">temp2</span><span class="p">,[</span><span class="s2">&quot;obs1&quot;</span><span class="p">,</span><span class="s2">&quot;obs2&quot;</span><span class="p">]))</span>
+
+    <span class="k">return</span> <span class="n">results</span>
+</code></pre></div></td></tr></table></div>
+      </details>
+  </div>
+
+</div>
+
+
+
+  </div>
+
+  </div>
+
+</div><h2 id="scalability">Scalability</h2>
 <p>Although SPAM-DFBA needs a large number of simulations for learning purpose, the simulation times scale linearly with the number of agents that are added. A survey on single, two, and five agent environment for starch-amylase case, see "Case Study - Starch Amylase", revealed this aspect which is shown below:</p>
 <p><img alt="runtime" src="../runtime.png" /></p>
 
