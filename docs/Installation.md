@@ -1,7 +1,8 @@
 # Installation 
 
 There are multiple ways to install SPAM-DFBA. Before doing any installation it is highly recomended that you create a new environment for this project.
-After creating the virtual environment and activating it, one way for installation is to clone the ripository and pip install from the source files:
+***NOTE:*** *This package requires Python >= 3.10
+After creating the virtual environment with Python >=3.10 and activating it, one way for installation is to clone the ripository and pip install from the source files:
 
 ```
 
