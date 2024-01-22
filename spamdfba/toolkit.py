@@ -438,11 +438,13 @@ def mass_transfer(x:float,y:float,k:float=0.01)->float:
     """A simple function for mass transfer kinetic """
     return k*(x-y)
 
-def rollout(env:Environment)->tuple:
+def rollout(env:Environment,num_workers:int|None)->tuple:
     """Performs a batch calculation in parallel using Ray library.
     Args:
         env (Environment): The environment instance to run the episodes for
     """
+    if num_workers is None:
+        num_workers=env.episodes_per_batch
     t0_batch=time.time()
     batch_obs={key.name:[] for key in env.agents}
     batch_acts={key.name:[] for key in env.agents}
@@ -457,11 +459,11 @@ def rollout(env:Environment)->tuple:
     batch=[]
     env.reset()
     
-    for ep in range(env.episodes_per_batch):
+    for ep in range(num_workers):
         # batch.append(run_episode_single(env))
         batch.append(run_episode.remote(env))
     batch=ray.get(batch)
-    for ep in range(env.episodes_per_batch):
+    for ep in range(num_workers):
         for ag in env.agents:
             batch_obs[ag.name].extend(batch[ep][0][ag.name])
             batch_acts[ag.name].extend(batch[ep][1][ag.name])
@@ -715,4 +717,6 @@ class Simulation:
             console = Console()
             console.print(table)
         return report_times
+
+
     
