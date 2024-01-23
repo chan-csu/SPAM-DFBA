@@ -438,7 +438,7 @@ def mass_transfer(x:float,y:float,k:float=0.01)->float:
     """A simple function for mass transfer kinetic """
     return k*(x-y)
 
-def rollout(env:Environment,num_workers:int|None)->tuple:
+def rollout(env:Environment,num_workers:int|None=None)->tuple:
     """Performs a batch calculation in parallel using Ray library.
     Args:
         env (Environment): The environment instance to run the episodes for
