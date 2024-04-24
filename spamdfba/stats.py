@@ -106,9 +106,6 @@ def compare_observations(
     
     
 if __name__ == "__main__":
-    obs1="/Users/parsaghadermarzi/Desktop/test/Toy-Exoenzyme-Five-Agents-Mass-Tansfer-high/observations_4500.pkl"
-    obs2="/Users/parsaghadermarzi/Desktop/test/Toy-Exoenzyme-Five-agents-mass-transfer-low/observations_4500.pkl"
-    res=compare_observations(obs1, obs2, [5,6], -1)
-    print(res[1])
+    pass
     
             

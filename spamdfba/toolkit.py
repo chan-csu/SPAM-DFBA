@@ -15,9 +15,14 @@ import plotly.graph_objs as go
 from rich.console import Console
 from rich.table import Table
 from typing import Iterable
+import multiprocessing as mp
+import warnings
+import signal
 # Ignore ray warnings to be communicated
+warnings.filterwarnings("ignore")
 ray.init(log_to_driver=False,ignore_reinit_error=True)
-
+mp.set_start_method('fork')
+mp.log_to_stderr()
 DEFAULT_PLOTLY_COLORS=['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
                        'rgb(44, 160, 44)', 'rgb(214, 39, 40)',
                        'rgb(148, 103, 189)', 'rgb(140, 86, 75)',
@@ -417,7 +422,7 @@ def Build_Mapping_Matrix(models:list[cobra.Model])->dict:
     Ex_sp = []
     Ex_rxns = []
     for model in models:
-        Ex_rxns.extend([(model,list(model.reactions[rxn].metabolites)[0].id,rxn) for rxn in model.exchange_reactions if model.reactions[rxn].id.endswith("_e") and rxn!=model.biomass_ind])
+        Ex_rxns.extend([(model,list(model.reactions.get_by_id(rxn.id).metabolites)[0].id,model.reactions.index(rxn.id)) for rxn in model.exchanges if model.reactions.index(rxn)!=model.biomass_ind])
     Ex_sp=list(set([item[1] for item in Ex_rxns]))
     Mapping_Matrix = np.full((len(Ex_sp), len(models)),-1, dtype=int)
     for record in Ex_rxns:
@@ -438,10 +443,12 @@ def mass_transfer(x:float,y:float,k:float=0.01)->float:
     """A simple function for mass transfer kinetic """
     return k*(x-y)
 
-def rollout(env:Environment,num_workers:int|None=None)->tuple:
+def rollout(env:Environment,num_workers:int|None=None,parallel_framework:str="native")->tuple:
     """Performs a batch calculation in parallel using Ray library.
     Args:
         env (Environment): The environment instance to run the episodes for
+        num_workers (int): Number of workers to be used in parallel computation. If None, the number of workers is equal to the number of episodes per batch.
+        parallel_framework (str): The parallel framework to be used. Currently you can choose between "ray" and "native". The native framework is a simple parallelization using python's multiprocessing library.
     """
     if num_workers is None:
         num_workers=env.episodes_per_batch
@@ -458,11 +465,18 @@ def rollout(env:Environment,num_workers:int|None=None)->tuple:
 
     batch=[]
     env.reset()
-    
-    for ep in range(num_workers):
-        # batch.append(run_episode_single(env))
-        batch.append(run_episode.remote(env))
-    batch=ray.get(batch)
+    if parallel_framework=="ray":
+        for ep in range(num_workers):
+            # batch.append(run_episode_single(env))
+            batch.append(run_episode_ray.remote(env))
+        batch=ray.get(batch)
+    elif parallel_framework=="native":
+
+        with mp.Pool(num_workers) as pool:
+            batch=pool.map(run_episode_single,[env for i in range(num_workers)])
+            
+    else:
+        raise ValueError("The parallel framework should be either 'ray' or 'native'")
     for ep in range(num_workers):
         for ag in env.agents:
             batch_obs[ag.name].extend(batch[ep][0][ag.name])
@@ -486,7 +500,7 @@ def rollout(env:Environment,num_workers:int|None=None)->tuple:
     return batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env.rewards.copy()
 
 @ray.remote
-def run_episode(env:Environment)->tuple:
+def run_episode_ray(env:Environment)->tuple:
     """ Runs a single episode of the environment used for parallel computatuon of episodes.
     """
     t_0_ep=time.time()
@@ -514,9 +528,14 @@ def run_episode(env:Environment)->tuple:
         env.time_dict["step"].append(time.time()-t_0_step)
     env.time_dict["episode"].append(time.time()-t_0_ep)
     return batch_obs,batch_acts, batch_log_probs, episode_rews,env.time_dict,env.rewards
+    
 
 def run_episode_single(env):
-    """ Runs a single episode of the environment."""
+    """ Runs a single episode of the environment used for parallel computatuon of episodes.
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    t_0_ep=time.time()
     batch_obs = {key.name:[] for key in env.agents}
     batch_acts = {key.name:[] for key in env.agents}
     batch_log_probs = {key.name:[] for key in env.agents}
@@ -529,14 +548,18 @@ def run_episode_single(env):
         for agent in env.agents:   
             action, log_prob = agent.get_actions(np.hstack([obs[agent.observables],env.t]))
             agent.a=action
-            agent.log_prob=log_prob .detach()        
+            agent.log_prob=log_prob.detach() 
+        t_0_step=time.time()
         s,r,a,sp=env.step()
+        env.time_dict["step"].append(time.time()-t_0_step)
         for ind,ag in enumerate(env.agents):
             batch_obs[ag.name].append(np.hstack([s[ag.observables],env.t]))
             batch_acts[ag.name].append(a[ind])
             batch_log_probs[ag.name].append(ag.log_prob)
             episode_rews[ag.name].append(r[ind])
-    return batch_obs,batch_acts, batch_log_probs, episode_rews
+        env.time_dict["step"].append(time.time()-t_0_step)
+    env.time_dict["episode"].append(time.time()-t_0_ep)
+    return batch_obs,batch_acts, batch_log_probs, episode_rews,env.time_dict,env.rewards
 
 
 class Simulation:
@@ -563,7 +586,7 @@ class Simulation:
         self.report={}
         
     
-    def run(self,solver:str="glpk",verbose:bool=True,initial_critic_error:float=100)->Environment:
+    def run(self,solver:str="glpk",verbose:bool=True,initial_critic_error:float=100,parallel_framework:str="native")->Environment:
         """This method runs the training loop
         
         Args:
@@ -591,7 +614,7 @@ class Simulation:
             agent.model.solver=solver
             
         for batch in range(self.env.number_of_batches):
-            batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env_rew=rollout(self.env) 
+            batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env_rew=rollout(self.env,parallel_framework=parallel_framework) 
             self.report["times"]["step"].append(np.mean(batch_times["step"]))
             self.report["times"]["optimization"].append(np.mean(batch_times["optimization"]))
             self.report["times"]["batch"].append(np.mean(batch_times["batch"]))
@@ -719,4 +742,6 @@ class Simulation:
         return report_times
 
 
-    
+
+if __name__=="__main__":
+    pass
