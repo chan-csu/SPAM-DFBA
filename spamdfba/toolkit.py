@@ -18,6 +18,8 @@ from typing import Iterable
 import multiprocessing as mp
 import warnings
 import signal
+import copy
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 # Ignore ray warnings to be communicated
 warnings.filterwarnings("ignore")
 ray.init(log_to_driver=False,ignore_reinit_error=True)
@@ -411,6 +413,11 @@ class Environment:
                 agent.optimizer_value_ = agent.optimizer_critic(agent.critic_network_.parameters(), lr=agent.lr_critic)
                 agent.optimizer_policy_ = agent.optimizer_actor(agent.actor_network_.parameters(), lr=agent.lr_actor)
     
+    def copy(self):
+        """ Returns a deep copy of the environment."""
+        return copy.deepcopy(self)
+        
+    
 
         
 def Build_Mapping_Matrix(models:list[cobra.Model])->dict:
@@ -471,9 +478,8 @@ def rollout(env:Environment,num_workers:int|None=None,parallel_framework:str="na
             batch.append(run_episode_ray.remote(env))
         batch=ray.get(batch)
     elif parallel_framework=="native":
-
         with mp.Pool(num_workers) as pool:
-            batch=pool.map(run_episode_single,[env for i in range(num_workers)])
+            batch=pool.map(run_episode_single,replicate_env(env,num_workers))
             
     else:
         raise ValueError("The parallel framework should be either 'ray' or 'native'")
@@ -742,6 +748,16 @@ class Simulation:
         return report_times
 
 
-
+def replicate_env(env:Environment,num)->list[Environment]:
+        envs=[]
+        if not os.path.exists("tmp"):
+            os.makedirs("tmp")
+        with open("tmp/env.pkl","wb") as f:
+            pickle.dump(env,f)
+        for i in range(num):
+            with open("tmp/env.pkl","rb") as f:
+                envs.append(pickle.load(f))
+            
+    
 if __name__=="__main__":
     pass
