@@ -749,14 +749,11 @@ class Simulation:
 
 
 def replicate_env(env:Environment,num)->list[Environment]:
-        envs=[]
-        if not os.path.exists("tmp"):
-            os.makedirs("tmp")
-        with open("tmp/env.pkl","wb") as f:
-            pickle.dump(env,f)
-        for i in range(num):
-            with open("tmp/env.pkl","rb") as f:
-                envs.append(pickle.load(f))
+    envs=[]
+    s=pickle.dumps(env)
+    for i in range(num):
+        envs.append(pickle.loads(s))
+    return envs
             
     
 if __name__=="__main__":
