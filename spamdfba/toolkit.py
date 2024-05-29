@@ -477,9 +477,11 @@ def rollout(env:Environment,num_workers:int|None=None,parallel_framework:str="na
             # batch.append(run_episode_single(env))
             batch.append(run_episode_ray.remote(env))
         batch=ray.get(batch)
+    
     elif parallel_framework=="native":
-        with mp.Pool(num_workers) as pool:
-            batch=pool.map(run_episode_single,replicate_env(env,num_workers))
+        with mp.Pool(num_workers,initializer=_initialize_mp()) as pool:
+            batch=[pool.apply_async(run_episode_single,args=(env,)) for i in range(num_workers)]
+            batch=[item.get() for item in batch]
             
     else:
         raise ValueError("The parallel framework should be either 'ray' or 'native'")
@@ -754,7 +756,11 @@ def replicate_env(env:Environment,num)->list[Environment]:
     for i in range(num):
         envs.append(pickle.loads(s))
     return envs
-            
+
+def _initialize_mp():
+    torch.seed()
+    np.random.seed()
+    
     
 if __name__=="__main__":
     pass

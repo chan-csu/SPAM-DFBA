@@ -108,6 +108,7 @@ agent1=tk.Agent("Bacllus_agent1",
                 lr_actor=0.0001,
                 lr_critic=0.001,
                 grad_updates=10,
+                actor_var=0.1,
                 optimizer_actor=torch.optim.Adam,
                 optimizer_critic=torch.optim.Adam,
                 observables=['Bacllus_agent1' ,"xyl__D_e", 'Xylan'],
@@ -128,10 +129,10 @@ constants=list(ic.keys())
 
 # %%
 def general_kinetics(a,b):
-    return 20*a*b/(1+a)  
+    return 20*a*b/(0.5+a)  
 
 # %%
-ic.update({"xyl__D_e":10,"Bacllus_agent1":0.01,"Xylan":1})
+ic.update({"xyl__D_e":10,"Bacllus_agent1":0.01,"Xylan":0.5})
 env_1=tk.Environment(name="Bacillus_168_Xylan",
                     agents=agents,
                     dilution_rate=0.00000001,
@@ -139,7 +140,7 @@ env_1=tk.Environment(name="Bacillus_168_Xylan",
                     inlet_conditions={},
                     extracellular_reactions=[
                     {"reaction":{
-                      "Xylose_oligo":5,
+                      "Xylose_oligo":10,
                       "Xylan":-0.1,},
                       "kinetics": (general_kinetics,("Xylan","xylanase"))},                                                                  
                     {"reaction":{
@@ -149,8 +150,8 @@ env_1=tk.Environment(name="Bacillus_168_Xylan",
                                            ],
                     constant=constants,
                      dt=0.1,
-                     number_of_batches=5000,
-                     episodes_per_batch=8,)
+                     number_of_batches=10000,
+                     episodes_per_batch=4,)
 
 # %%
 sim_1=tk.Simulation(name=env_1.name,
@@ -162,7 +163,7 @@ sim_1=tk.Simulation(name=env_1.name,
 env_1.agents[0].model.solver="gurobi"
 
 # %%
-sim_1.run(initial_critic_error=1000,parallel_framework='ray')
+sim_1.run(initial_critic_error=1000)
 
 # %%
 
