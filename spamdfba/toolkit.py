@@ -19,11 +19,10 @@ import multiprocessing as mp
 import warnings
 import signal
 import copy
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 # Ignore ray warnings to be communicated
 warnings.filterwarnings("ignore")
 ray.init(log_to_driver=False,ignore_reinit_error=True)
-mp.set_start_method('fork')
+mp.set_start_method('fork',force=True)
 mp.log_to_stderr()
 DEFAULT_PLOTLY_COLORS=['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
                        'rgb(44, 160, 44)', 'rgb(214, 39, 40)',
@@ -49,10 +48,15 @@ class NN(nn.Module):
         n_hidden (int): number of hidden layers in the neural network.
      
     """
-    def __init__(self,input_dim:int,output_dim:int,hidden_dim:int=20,activation=nn.ReLU,n_hidden:int=8)-> None:
+    def __init__(self,input_dim:int,output_dim:int,hidden_dim:int=100,activation=nn.ReLU,n_hidden:int=4)-> None:
         super(NN,self).__init__()
         self.inlayer=nn.Sequential(nn.Linear(input_dim,hidden_dim),activation())
-        self.hidden=nn.Sequential(*[nn.Linear(hidden_dim,hidden_dim),activation()]*n_hidden)
+        # self.hidden=nn.Sequential(*[nn.Linear(hidden_dim,hidden_dim),activation()]*n_hidden)
+        hidden_layers=[]
+        for i in range(n_hidden):
+            hidden_layers.append(nn.Linear(hidden_dim,hidden_dim))
+            hidden_layers.append(activation())
+        self.hidden=nn.Sequential(*hidden_layers)
         self.output=nn.Linear(hidden_dim,output_dim)
     
     def forward(self, obs:torch.FloatTensor)-> torch.FloatTensor:
@@ -110,8 +114,8 @@ class Agent:
                 actions:list[str],
                 observables:list[str],
                 gamma:float,
-                clip:float=0.01,
-                actor_var:float=0.1,
+                clip:float=0.1,
+                actor_var:float=0.5,
                 grad_updates:int=1,
                 lr_actor:float=0.001,
                 lr_critic:float=0.001,
@@ -142,10 +146,11 @@ class Agent:
         The derivatives are not calculated here.
         """
         mean = self.actor_network_(torch.tensor(observation, dtype=torch.float32)).detach()
-        # dist = MultivariateNormal(mean, self.actor_var)(mean, self.cov_mat)
-        dist = Normal(mean, self.actor_var)
+        dist = MultivariateNormal(mean, self.cov_mat)
+        # dist = Normal(mean, self.actor_var)
         action = dist.sample()
-        log_prob =torch.sum(dist.log_prob(action))        # log_prob = dist.log_prob(action)
+        # log_prob =torch.sum(dist.log_prob(action))        
+        log_prob = dist.log_prob(action)
         return action.detach().numpy(), log_prob
    
     def evaluate(self, batch_obs:np.ndarray ,batch_acts:np.ndarray):
@@ -155,9 +160,10 @@ class Agent:
         """
         V = self.critic_network_(batch_obs).squeeze()
         mean = self.actor_network_(batch_obs)
-        # dist = MultivariateNormal(mean, self.cov_mat)
-        dist = Normal(mean, self.actor_var)
-        log_probs = torch.sum(dist.log_prob(batch_acts),dim=1)
+        dist = MultivariateNormal(mean, self.cov_mat)
+        # dist = Normal(mean, self.actor_var)
+        # log_probs = torch.sum(dist.log_prob(batch_acts),dim=1)
+        log_probs = dist.log_prob(batch_acts)
 
         return V, log_probs 
     
@@ -763,4 +769,99 @@ def _initialize_mp():
     
     
 if __name__=="__main__":
-    pass
+    # from spamdfba import toymodels as tm
+    # from spamdfba import toolkit as tk
+    # agent1=tk.Agent("agent1",
+    #     model=tm.ToyModel_SA.copy(),
+    #     actor_network=tk.NN,
+    #     critic_network=tk.NN,
+    #     clip=0.1,
+    #     lr_actor=0.0001,
+    #     lr_critic=0.001,
+    #     grad_updates=4,
+    #     optimizer_actor=torch.optim.Adam,
+    #     optimizer_critic=torch.optim.Adam,
+    #     observables=['agent1','agent2' ,'Glc', 'Starch'],
+    #     actions=["Amylase_e"],
+    #     gamma=1,
+    #     )
+    # agent2=tk.Agent("agent2",
+    #     model=tm.ToyModel_SA.copy(),
+    #     actor_network=tk.NN,
+    #     critic_network=tk.NN,
+    #     clip=0.1,
+    #     lr_actor=0.0001,
+    #     lr_critic=0.001,
+    #     grad_updates=4,
+    #     optimizer_actor=torch.optim.Adam,
+    #     optimizer_critic=torch.optim.Adam,
+    #     observables=['agent1','agent2', 'Glc', 'Starch'],
+    #     actions=["Amylase_e"],
+    #     gamma=1,
+    #     )
+    # agents=[agent1,agent2]
+
+    # env=tk.Environment(name="Toy-Exoenzyme-Two-agents",
+    #         agents=agents,
+    #         dilution_rate=0.0001,
+    #         initial_condition={"Glc":100,"agent1":0.1,"agent2":0.1,"Starch":10},
+    #         inlet_conditions={"Starch":10},
+    #         extracellular_reactions=[{"reaction":{
+    #         "Glc":10,
+    #         "Starch":-0.1,},
+    #         "kinetics": (tk.general_kinetic,("Glc","Amylase"))}],
+    #                 dt=0.1,
+    #                 number_of_batches=1000,
+    #                 episodes_per_batch=int(4/2),
+    #                 ) 
+    # run_episode_single(env)
+    class TestModel:
+        def __init__(self,reactions):
+            self.reactions=reactions
+            self.exchanges=reactions
+            self.biomass_ind=0
+    model=TestModel(["dir"])
+        
+    agent=Agent("agent1",
+                model=model,
+                actor_network=NN,
+                critic_network=NN,
+                clip=0.1,
+                lr_actor=0.0001,
+                lr_critic=0.001,
+                grad_updates=1,
+                actor_var=0.1,
+                optimizer_actor=torch.optim.Adam,
+                optimizer_critic=torch.optim.Adam,
+                observables=[],
+                actions=["dir"],
+                gamma=1,
+                )
+    class TestEnvironment(Environment):
+        def step(self):
+            for agent in self.agents:
+                agent.reward=0
+                for index,flux in enumerate(agent.actions):
+                    agent.reward+=np.sign(self.t-10)*agent.a[index]
+        
+            return self.state,[i.reward for i in self.agents],[i.a for i in self.agents],self.state
+    
+    env=TestEnvironment(
+        name="test_RL_perf",
+        agents=[agent],
+        extracellular_reactions=[],
+        initial_condition={},
+        inlet_conditions={},
+        number_of_batches=20000,
+        episode_length=20,
+        dt=1,
+        dilution_rate=0.05,
+        episodes_per_batch=8,
+    )
+    
+    run_episode_single(env)
+    # sim=Simulation("test_RL_perf",env,"./")
+    # sim.run()
+    with open("/Users/parsaghadermarzi/Desktop/Academics/Projects/SPAM-DFBA/spamdfba/test_RL_perf/test_RL_perf_10000_acts.pkl","rb") as f:
+        acts=pickle.load(f)
+    print(acts)
