@@ -132,7 +132,7 @@ def general_kinetics(a,b):
     return 20*a*b/(0.5+a)  
 
 # %%
-ic.update({"xyl__D_e":10,"Bacllus_agent1":0.01,"Xylan":0.5})
+ic.update({"xyl__D_e":10,"Bacllus_agent1":0.01,"Xylan":0.1})
 env_1=tk.Environment(name="Bacillus_168_Xylan",
                     agents=agents,
                     dilution_rate=0.00000001,
