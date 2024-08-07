@@ -49,7 +49,7 @@ class ActorNN(nn.Module):
         n_hidden (int): number of hidden layers in the neural network.
      
     """
-    def __init__(self,input_dim:int,output_dim:int,clip:list[list],hidden_dim:int=20,activation=nn.Tanh,n_hidden:int=5)-> None:
+    def __init__(self,input_dim:int,output_dim:int,clip:list[list],hidden_dim:int=20,activation=nn.ReLU,n_hidden:int=5)-> None:
         super(ActorNN,self).__init__()
         self.inlayer=nn.Sequential(nn.Linear(input_dim,hidden_dim),activation())
         # self.hidden=nn.Sequential(*[nn.Linear(hidden_dim,hidden_dim),activation()]*n_hidden)
@@ -67,6 +67,7 @@ class ActorNN(nn.Module):
         out=self.hidden(out)
         out=self.output(out)
         out=torch.clamp(out,self.clip[:,0],self.clip[:,1])
+        # out=torch.clamp(out,self.clip[:,0],self.clip[:,1])
         return out
 
 class CriticNN(nn.Module):
@@ -99,7 +100,9 @@ class CriticNN(nn.Module):
         out=self.output(out)
         return out
 
-
+def default_var_handler(batch):
+    return 0.1
+    
 
 class Agent:
     """ An object of this class defines an agent in the environment. At the core of an agent lies a COBRA model.
@@ -156,6 +159,7 @@ class Agent:
                 grad_updates:int=1,
                 lr_actor:float=0.001,
                 lr_critic:float=0.001,
+                variance_handler:callable=default_var_handler,
                 
                 ) -> None:
 
@@ -178,6 +182,7 @@ class Agent:
         self.cov_var = torch.full(size=(len(self.actions),), fill_value=0.1)
         self.cov_mat = torch.diag(self.cov_var)
         self.action_ranges=action_ranges
+        self.variance_handler=variance_handler
    
     def get_actions(self,observation:np.ndarray):
         """ 
@@ -549,6 +554,7 @@ def rollout(env:Environment,num_workers:int|None=None,parallel_framework:str="na
         batch_acts[agent.name] = torch.tensor(batch_acts[agent.name], dtype=torch.float)
         batch_log_probs[agent.name] = torch.tensor(batch_log_probs[agent.name], dtype=torch.float)
         batch_rtgs[agent.name] = agent.compute_rtgs(batch_rews[agent.name]) 
+        batch_rews[agent.name] = torch.tensor(batch_rews[agent.name], dtype=torch.float)
     batch_times["batch"].append(time.time()-t0_batch)
     return batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env.rewards.copy()
 
@@ -612,7 +618,7 @@ def run_episode_single(env):
             episode_rews[ag.name].append(r[ind])
         env.time_dict["step"].append(time.time()-t_0_step)
     env.time_dict["episode"].append(time.time()-t_0_ep)
-    return batch_obs,batch_acts, batch_log_probs, episode_rews,env.time_dict,env.rewards
+    return batch_obs,batch_acts, batch_log_probs, episode_rews,env.time_dict,env.rewards,episode_rews
 
 
 class Simulation:
@@ -667,9 +673,10 @@ class Simulation:
             agent.model.solver=solver
             
         for batch in range(self.env.number_of_batches):
-            # for agent in self.env.agents:
-            #     agent.cov_var = torch.full(size=(len(agent.actions),), fill_value=10/np.sqrt(batch+1))
-            #     agent.cov_mat = torch.diag(agent.cov_var)
+            for agent in self.env.agents:
+                agent.cov_var = torch.full(size=(len(agent.actions),), fill_value=agent.variance_handler(batch))
+                agent.cov_mat = torch.diag(agent.cov_var)
+            
             batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env_rew=rollout(self.env,parallel_framework=parallel_framework) 
             self.report["times"]["step"].append(np.mean(batch_times["step"]))
             self.report["times"]["optimization"].append(np.mean(batch_times["optimization"]))
@@ -809,8 +816,10 @@ def replicate_env(env:Environment,num)->list[Environment]:
 def _initialize_mp():
     torch.seed()
     np.random.seed()
-    
-    
+
+def sqrt_variance_handler(batch):
+    return 1/np.sqrt(batch+1)
+
 if __name__=="__main__":
     # from spamdfba import toymodels as tm
     # from spamdfba import toolkit as tk
@@ -868,19 +877,21 @@ if __name__=="__main__":
     # model=TestModel(["1","2"])
     model=cobra.Model()
     model.add_reactions([cobra.Reaction("1"),cobra.Reaction("2"),cobra.Reaction("3")])
+
     agent=Agent("agent1",
                 model=model,
                 actor_network=ActorNN,
                 critic_network=CriticNN,
                 clip=0.1,
-                lr_actor=0.0005,
+                lr_actor=0.0001,
                 lr_critic=0.001,
-                grad_updates=1,
+                grad_updates=5,
                 actor_var=0.1,
                 action_ranges=[[-10,10],[-10,10],[-10,10]],
                 optimizer_actor=torch.optim.Adam,
                 optimizer_critic=torch.optim.Adam,
                 observables=[],
+                variance_handler=sqrt_variance_handler,
                 actions=["1","2","3"],
                 gamma=1,
                 )
@@ -914,11 +925,12 @@ if __name__=="__main__":
         episodes_per_batch=8,
     )
 
-    run_episode_single(env)
-    sim=Simulation("test_RL_perf",env,"./")
-    sim.run(parallel_framework="ray",initial_critic_error=2000)
-    # with open("/Users/parsaghadermarzi/Desktop/Academics/Projects/SPAM-DFBA/spamdfba/test_RL_perf/test_RL_perf_4800_acts.pkl","rb") as f:
-    #     acts=pickle.load(f)
-    # print(acts["agent1"])
-    # print(acts["agent1"].mean(axis=0))
-    # print(acts["agent1"].std(axis=0))
+    # run_episode_single(env)
+
+    # sim=Simulation("test_RL_perf",env,"./")
+    # sim.run(parallel_framework="ray",initial_critic_error=2000)
+    with open("/Users/parsaghadermarzi/Desktop/Academics/Projects/SPAM-DFBA/spamdfba/test_RL_perf/test_RL_perf_2000_acts.pkl","rb") as f:
+        acts=pickle.load(f)
+    print(acts["agent1"])
+    print(acts["agent1"].mean(axis=0))
+    print(acts["agent1"].std(axis=0))
