@@ -48,7 +48,7 @@ P18429="MFKFKKNFLVGLSAALMSISLFSATASAASTDYWQNWTDGGGIVNAVNGSGGNYSVNWSNTGNFVVGKGWTT
 P94489="MKITNPVLKGFNPDPSICRAGEDYYIAVSTFEWFPGVQIHHSKDLVNWHLVAHPLQRVSQLDMKGNPNSGGVWAPCLSYSDGKFWLIYTDVKVVDGAWKDCHNYLVTCETINGDWSEPIKLNSSGFDASLFHDTDGKKYLLNMLWDHRIDRHSFGGIVIQEYSDKEQKLIGKPKVIFEGTDRKLTEAPHLYHIGNYYYLLTAEGGTRYEHAATIARSANIEGPYEVHPDNPILTSWHDPGNPLQKCGHASIVQTHTDEWYLAHLTGRPIHPDDDSIFQQRGYCPLGRETAIQKLYWKDEWPYVVGGKEGSLEVDAPSIPETIFEATYPEVDEFEDSTLNINFQTLRIPFTNELGSLTQAPNHLRLFGHESLTSTFTQAFVARRWQSLHFEAETAVEFYPENFQQAAGLVNYYNTENWTALQVTHDEELGRILELTICDNFSFSQPLNNKIVIPREVKYVYLRVNIEKDKYYYFYSFNKEDWHKIDIALESKKLSDDYIRGGGFFTGAFVGMQCQDTSGNHIPADFRYFRYKEK"
 
 # %%
-def get_protein_production_reaction(protein_name:str,protein_sequence:str,atp_per_aa:float=4.2)->cobra.Reaction:
+def get_protein_production_reaction(protein_name:str,protein_sequence:str,atp_per_aa:float=0.1)->cobra.Reaction:
     aa_name_conversion = {
         "A": "ala__L_c",
         "R": "arg__L_c",
@@ -128,11 +128,13 @@ del ic["glc__D_e"]
 constants=list(ic.keys())
 
 # %%
-def general_kinetics(a,b):
-    return 20*a*b/(0.5+a)  
+def general_kinetics_xylanase(a,b):
+    return 10*a*b/(0.5+a)  
+def general_kinetics_xylosidase(a,b):
+    return 10*a*b/(0.5+a)  
 
 # %%
-ic.update({"xyl__D_e":20,"Bacllus_agent1":0.01,"Xylan":0.2})
+ic.update({"xyl__D_e":5,"Bacllus_agent1":0.1,"Xylan":5})
 env_1=tk.Environment(name="Bacillus_168_Xylan",
                     agents=agents,
                     dilution_rate=0.00000001,
@@ -140,19 +142,19 @@ env_1=tk.Environment(name="Bacillus_168_Xylan",
                     inlet_conditions={},
                     extracellular_reactions=[
                     {"reaction":{
-                      "Xylose_oligo":10,
-                      "Xylan":-0.1,},
-                      "kinetics": (general_kinetics,("Xylan","xylanase"))},                                                                  
+                      "Xylose_oligo":100,
+                      "Xylan":-1,},
+                      "kinetics": (general_kinetics_xylanase,("Xylan","xylanase"))},                                                                  
                     {"reaction":{
                       "Xylose_oligo":-1,
-                      "xyl__D_e":5,},
-                      "kinetics": (general_kinetics,("Xylose_oligo","xylosidase"))},
+                      "xyl__D_e":3,},
+                      "kinetics": (general_kinetics_xylosidase,("Xylose_oligo","xylosidase"))},
                                            ],
                     constant=constants,
                      dt=0.5,
                      number_of_batches=10000,
-                     episode_length=50,
-                     episodes_per_batch=8,)
+                     episode_length=1000,
+                     episodes_per_batch=4,)
 
 # %%
 sim_1=tk.Simulation(name=env_1.name,
@@ -164,9 +166,9 @@ sim_1=tk.Simulation(name=env_1.name,
 env_1.agents[0].model.solver="gurobi"
 
 # %%
-sim_1.run(initial_critic_error=1000,parallel_framework="ray")
+# sim_1.run(initial_critic_error=3000,parallel_framework="ray")
 
 # %%
 
-
+tk.run_episode_single(env_1)
 

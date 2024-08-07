@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal,Normal
+import torch.nn.functional as F
 import pickle,logging
 import time
 import ray
@@ -36,7 +37,7 @@ DEFAULT_PLOTLY_COLORS_BACK=['rgba(31, 119, 180,0.2)', 'rgba(255, 127, 14,0.2)',
                        'rgba(188, 189, 34,0.2)', 'rgba(23, 190, 207,0.2)']*10
 
 
-class NN(nn.Module):
+class ActorNN(nn.Module):
     """
     This class is a subclass of nn.Module and is a general class for defining function approximators in the RL problems.
     
@@ -48,8 +49,8 @@ class NN(nn.Module):
         n_hidden (int): number of hidden layers in the neural network.
      
     """
-    def __init__(self,input_dim:int,output_dim:int,hidden_dim:int=100,activation=nn.ReLU,n_hidden:int=4)-> None:
-        super(NN,self).__init__()
+    def __init__(self,input_dim:int,output_dim:int,clip:list[list],hidden_dim:int=20,activation=nn.Tanh,n_hidden:int=5)-> None:
+        super(ActorNN,self).__init__()
         self.inlayer=nn.Sequential(nn.Linear(input_dim,hidden_dim),activation())
         # self.hidden=nn.Sequential(*[nn.Linear(hidden_dim,hidden_dim),activation()]*n_hidden)
         hidden_layers=[]
@@ -58,12 +59,47 @@ class NN(nn.Module):
             hidden_layers.append(activation())
         self.hidden=nn.Sequential(*hidden_layers)
         self.output=nn.Linear(hidden_dim,output_dim)
+        self.clip=torch.tensor(clip)
+
+    
+    def forward(self, obs:torch.FloatTensor)-> torch.FloatTensor:
+        out=self.inlayer(obs)
+        out=self.hidden(out)
+        out=self.output(out)
+        out=torch.clamp(out,self.clip[:,0],self.clip[:,1])
+        return out
+
+class CriticNN(nn.Module):
+    """
+    This class is a subclass of nn.Module and is a general class for defining function approximators in the RL problems.
+    
+    Args:
+        input_dim (int): dimension of the input, states, tensor.
+        output_dim (int): dimension of the output tensor.
+        hidden_dim (int): dimension of each hidden layer, defults to 20.
+        activation : Type of the activation layer. Usually nn.Relu or nn.Tanh.
+        n_hidden (int): number of hidden layers in the neural network.
+     
+    """
+    def __init__(self,input_dim:int,output_dim:int,hidden_dim:int=10,activation=nn.ReLU,n_hidden:int=2)-> None:
+        super(CriticNN,self).__init__()
+        self.inlayer=nn.Sequential(nn.Linear(input_dim,hidden_dim),activation())
+        # self.hidden=nn.Sequential(*[nn.Linear(hidden_dim,hidden_dim),activation()]*n_hidden)
+        hidden_layers=[]
+        for i in range(n_hidden):
+            hidden_layers.append(nn.Linear(hidden_dim,hidden_dim))
+            hidden_layers.append(activation())
+        self.hidden=nn.Sequential(*hidden_layers)
+        self.output=nn.Linear(hidden_dim,output_dim)
+
     
     def forward(self, obs:torch.FloatTensor)-> torch.FloatTensor:
         out=self.inlayer(obs)
         out=self.hidden(out)
         out=self.output(out)
         return out
+
+
 
 class Agent:
     """ An object of this class defines an agent in the environment. At the core of an agent lies a COBRA model.
@@ -107,18 +143,20 @@ class Agent:
     def __init__(self,
                 name:str,
                 model:cobra.Model,
-                actor_network:NN,
-                critic_network:NN,
+                actor_network:ActorNN,
+                critic_network:CriticNN,
                 optimizer_critic:torch.optim.Adam,
                 optimizer_actor:torch.optim.Adam,
+                action_ranges:list[list],
                 actions:list[str],
                 observables:list[str],
                 gamma:float,
                 clip:float=0.1,
-                actor_var:float=0.5,
+                actor_var:float=0.1,
                 grad_updates:int=1,
                 lr_actor:float=0.001,
                 lr_critic:float=0.001,
+                
                 ) -> None:
 
         self.name = name
@@ -139,6 +177,7 @@ class Agent:
         self.critic_network = critic_network
         self.cov_var = torch.full(size=(len(self.actions),), fill_value=0.1)
         self.cov_mat = torch.diag(self.cov_var)
+        self.action_ranges=action_ranges
    
     def get_actions(self,observation:np.ndarray):
         """ 
@@ -414,7 +453,7 @@ class Environment:
         """ Sets up the networks and optimizers for the agents in the environment."""
         if self.training==True:
             for agent in self.agents:
-                agent.actor_network_=agent.actor_network(len(agent.observables)+1,len(agent.actions))
+                agent.actor_network_=agent.actor_network(len(agent.observables)+1,len(agent.actions),agent.action_ranges)
                 agent.critic_network_=agent.critic_network(len(agent.observables)+1,1)
                 agent.optimizer_value_ = agent.optimizer_critic(agent.critic_network_.parameters(), lr=agent.lr_critic)
                 agent.optimizer_policy_ = agent.optimizer_actor(agent.actor_network_.parameters(), lr=agent.lr_actor)
@@ -547,8 +586,8 @@ def run_episode_ray(env:Environment)->tuple:
 def run_episode_single(env):
     """ Runs a single episode of the environment used for parallel computatuon of episodes.
     """
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    # signal.signal(signal.SIGINT, signal.SIG_IGN)
+    # signal.signal(signal.SIGTERM, signal.SIG_IGN)
     t_0_ep=time.time()
     batch_obs = {key.name:[] for key in env.agents}
     batch_acts = {key.name:[] for key in env.agents}
@@ -628,6 +667,9 @@ class Simulation:
             agent.model.solver=solver
             
         for batch in range(self.env.number_of_batches):
+            # for agent in self.env.agents:
+            #     agent.cov_var = torch.full(size=(len(agent.actions),), fill_value=10/np.sqrt(batch+1))
+            #     agent.cov_mat = torch.diag(agent.cov_var)
             batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env_rew=rollout(self.env,parallel_framework=parallel_framework) 
             self.report["times"]["step"].append(np.mean(batch_times["step"]))
             self.report["times"]["optimization"].append(np.mean(batch_times["optimization"]))
@@ -647,7 +689,8 @@ class Simulation:
                             agent.optimizer_value_.zero_grad()  
                             critic_loss.backward()  
                             agent.optimizer_value_.step()   
-                            err=critic_loss.item()  
+                            err=critic_loss.item() 
+                            print(f"Current error is {err}") 
                     if verbose:
                         print("Done!")   
                 else: 
@@ -815,37 +858,49 @@ if __name__=="__main__":
     #                 episodes_per_batch=int(4/2),
     #                 ) 
     # run_episode_single(env)
-    class TestModel:
-        def __init__(self,reactions):
-            self.reactions=reactions
-            self.exchanges=reactions
-            self.biomass_ind=0
-    model=TestModel(["dir"])
-        
+    # class TestModel:
+    #     def __init__(self,reactions):
+    #         self.reactions=reactions
+    #         self.exchanges=["1","2","3"]
+    #         self.species=[]
+    #         self.biomass_ind=0
+  
+    # model=TestModel(["1","2"])
+    model=cobra.Model()
+    model.add_reactions([cobra.Reaction("1"),cobra.Reaction("2"),cobra.Reaction("3")])
     agent=Agent("agent1",
                 model=model,
-                actor_network=NN,
-                critic_network=NN,
+                actor_network=ActorNN,
+                critic_network=CriticNN,
                 clip=0.1,
-                lr_actor=0.0001,
+                lr_actor=0.0005,
                 lr_critic=0.001,
                 grad_updates=1,
                 actor_var=0.1,
+                action_ranges=[[-10,10],[-10,10],[-10,10]],
                 optimizer_actor=torch.optim.Adam,
                 optimizer_critic=torch.optim.Adam,
                 observables=[],
-                actions=["dir"],
+                actions=["1","2","3"],
                 gamma=1,
                 )
     class TestEnvironment(Environment):
         def step(self):
             for agent in self.agents:
                 agent.reward=0
-                for index,flux in enumerate(agent.actions):
-                    agent.reward+=np.sign(self.t-10)*agent.a[index]
-        
-            return self.state,[i.reward for i in self.agents],[i.a for i in self.agents],self.state
+                agent.reward+=np.sign(agent.a[0]-1)
+                agent.reward+=np.sign(1-agent.a[1])
+                if agent.a[2]<1 and agent.a[2]>0:
+                    agent.reward+=1
     
+            return self.state,[i.reward for i in self.agents],[i.a for i in self.agents],self.state
+        def resolve_extracellular_reactions(self, extracellular_reactions: list[dict]) -> None:
+            pass
+        def build_mapping_matrix(self,models):
+            pass    
+        
+
+
     env=TestEnvironment(
         name="test_RL_perf",
         agents=[agent],
@@ -858,10 +913,12 @@ if __name__=="__main__":
         dilution_rate=0.05,
         episodes_per_batch=8,
     )
-    
+
     run_episode_single(env)
-    # sim=Simulation("test_RL_perf",env,"./")
-    # sim.run()
-    with open("/Users/parsaghadermarzi/Desktop/Academics/Projects/SPAM-DFBA/spamdfba/test_RL_perf/test_RL_perf_10000_acts.pkl","rb") as f:
-        acts=pickle.load(f)
-    print(acts)
+    sim=Simulation("test_RL_perf",env,"./")
+    sim.run(parallel_framework="ray",initial_critic_error=2000)
+    # with open("/Users/parsaghadermarzi/Desktop/Academics/Projects/SPAM-DFBA/spamdfba/test_RL_perf/test_RL_perf_4800_acts.pkl","rb") as f:
+    #     acts=pickle.load(f)
+    # print(acts["agent1"])
+    # print(acts["agent1"].mean(axis=0))
+    # print(acts["agent1"].std(axis=0))
