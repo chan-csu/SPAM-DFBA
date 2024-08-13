@@ -155,7 +155,6 @@ class Agent:
                 observables:list[str],
                 gamma:float,
                 clip:float=0.1,
-                actor_var:float=0.1,
                 grad_updates:int=1,
                 lr_actor:float=0.001,
                 lr_critic:float=0.001,
@@ -173,17 +172,15 @@ class Agent:
         self.observables = observables
         self.general_uptake_kinetics=general_uptake
         self.clip = clip
-        self.actor_var = actor_var
         self.lr_actor = lr_actor
         self.lr_critic = lr_critic
         self.grad_updates = grad_updates
         self.actor_network = actor_network
         self.critic_network = critic_network
-        self.cov_var = torch.full(size=(len(self.actions),), fill_value=0.1)
-        self.cov_mat = torch.diag(self.cov_var)
         self.action_ranges=action_ranges
         self.variance_handler=variance_handler
-   
+        self.cov_var = torch.full(size=(len(self.actions),), fill_value=variance_handler(0))
+        self.cov_mat = torch.diag(self.cov_var)
     def get_actions(self,observation:np.ndarray):
         """ 
         This method will draw the actions from a normal distribution around the actor netwrok prediction.
@@ -416,11 +413,15 @@ class Environment:
             Sols[i] = self.agents[i].model.optimize()
             self.time_dict["optimization"].append(time.time()-t_0)
             if Sols[i].status == 'infeasible':
-                self.agents[i].reward=-1
+                # self.agents[i].reward=-1
                 dCdt[i] = 0
             else:
                 dCdt[i] += Sols[i].objective_value*self.state[i]
-                self.agents[i].reward =Sols[i].objective_value*self.state[i]
+                #self.agents[i].reward = Sols[i].objective_value*self.state[i]
+            if self.t!=1:
+                self.agents[i].reward =0
+            else:
+                self.agents[i].reward = self.state[i]
 
         for i in range(self.mapping_matrix["Mapping_Matrix"].shape[0]):
         
@@ -886,7 +887,6 @@ if __name__=="__main__":
                 lr_actor=0.0001,
                 lr_critic=0.001,
                 grad_updates=5,
-                actor_var=0.1,
                 action_ranges=[[-10,10],[-10,10],[-10,10]],
                 optimizer_actor=torch.optim.Adam,
                 optimizer_critic=torch.optim.Adam,
@@ -925,7 +925,7 @@ if __name__=="__main__":
         episodes_per_batch=8,
     )
 
-    # run_episode_single(env)
+    run_episode_single(env)
 
     # sim=Simulation("test_RL_perf",env,"./")
     # sim.run(parallel_framework="ray",initial_critic_error=2000)
