@@ -48,7 +48,7 @@ P18429="MFKFKKNFLVGLSAALMSISLFSATASAASTDYWQNWTDGGGIVNAVNGSGGNYSVNWSNTGNFVVGKGWTT
 P94489="MKITNPVLKGFNPDPSICRAGEDYYIAVSTFEWFPGVQIHHSKDLVNWHLVAHPLQRVSQLDMKGNPNSGGVWAPCLSYSDGKFWLIYTDVKVVDGAWKDCHNYLVTCETINGDWSEPIKLNSSGFDASLFHDTDGKKYLLNMLWDHRIDRHSFGGIVIQEYSDKEQKLIGKPKVIFEGTDRKLTEAPHLYHIGNYYYLLTAEGGTRYEHAATIARSANIEGPYEVHPDNPILTSWHDPGNPLQKCGHASIVQTHTDEWYLAHLTGRPIHPDDDSIFQQRGYCPLGRETAIQKLYWKDEWPYVVGGKEGSLEVDAPSIPETIFEATYPEVDEFEDSTLNINFQTLRIPFTNELGSLTQAPNHLRLFGHESLTSTFTQAFVARRWQSLHFEAETAVEFYPENFQQAAGLVNYYNTENWTALQVTHDEELGRILELTICDNFSFSQPLNNKIVIPREVKYVYLRVNIEKDKYYYFYSFNKEDWHKIDIALESKKLSDDYIRGGGFFTGAFVGMQCQDTSGNHIPADFRYFRYKEK"
 
 # %%
-def get_protein_production_reaction(protein_name:str,protein_sequence:str,atp_per_aa:float=0.1)->cobra.Reaction:
+def get_protein_production_reaction(protein_name:str,protein_sequence:str,atp_per_aa:float=4.2)->cobra.Reaction:
     aa_name_conversion = {
         "A": "ala__L_c",
         "R": "arg__L_c",
@@ -108,8 +108,7 @@ agent1=tk.Agent("Bacllus_agent1",
                 lr_actor=0.0005,
                 lr_critic=0.001,
                 grad_updates=5,
-                actor_var=0.5,
-                action_ranges=[[-1,5],[-1,5]],
+                action_ranges=[[-10,5],[-10,5]],
                 optimizer_actor=torch.optim.Adam,
                 optimizer_critic=torch.optim.Adam,
                 observables=['Bacllus_agent1' ,"xyl__D_e", 'Xylan'],
@@ -131,15 +130,15 @@ constants=list(ic.keys())
 
 # %%
 def general_kinetics_xylanase(a,b):
-    return 1*a*b/(0.5+a)  
-def general_kinetics_xylosidase(a,b):
     return 10*a*b/(0.5+a)  
+def general_kinetics_xylosidase(a,b):
+    return 30*a*b/(0.5+a)  
 
 def variance_handler(batch_num):
     return max(0.5/np.sqrt(batch_num),0.01)
 
 # %%
-ic.update({"xyl__D_e":5,"Bacllus_agent1":0.1,"Xylan":5})
+ic.update({"xyl__D_e":5,"Bacllus_agent1":0.01,"Xylan":1})
 env_1=tk.Environment(name="Bacillus_168_Xylan",
                     agents=agents,
                     dilution_rate=0.00000001,
@@ -147,24 +146,40 @@ env_1=tk.Environment(name="Bacillus_168_Xylan",
                     inlet_conditions={},
                     extracellular_reactions=[
                     {"reaction":{
-                      "Xylose_oligo":10,
+                      "Xylose_oligo":100,
                       "Xylan":-1,},
                       "kinetics": (general_kinetics_xylanase,("Xylan","xylanase"))},                                                                  
                     {"reaction":{
                       "Xylose_oligo":-1,
-                      "xyl__D_e":3,},
+                      "xyl__D_e":5,},
                       "kinetics": (general_kinetics_xylosidase,("Xylose_oligo","xylosidase"))},
                                            ],
                     constant=constants,
                      dt=0.5,
                      number_of_batches=10000,
-                     episode_length=1000,
-                     episodes_per_batch=4,)
+                     episode_length=100,
+                     episodes_per_batch=8,)
 
 # %%
+### train the agents actor network to output -0.5 and -0.5 (No xylanase and xylosidase production)
+
+# %%
+initial_training_states=torch.rand(10000,4)*1000
+action_labels=torch.tensor([[-10.,-10.]]*10000)
+for i in range(1000):
+    outs=env_1.agents[0].actor_network_(torch.tensor(initial_training_states))
+    env_1.agents[0].optimizer_policy_.zero_grad()
+    loss=nn.MSELoss()(outs,action_labels)
+    loss.backward()
+    env_1.agents[0].optimizer_policy_.step()
+    if i%10==0:
+        print(loss)
+    
+
 sim_1=tk.Simulation(name=env_1.name,
                   env=env_1,
                   save_dir="./Results/",
+                  save_every=10
                   )
 
 # %%
