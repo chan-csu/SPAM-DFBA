@@ -164,16 +164,16 @@ env_1=tk.Environment(name="Bacillus_168_Xylan",
 ### train the agents actor network to output -0.5 and -0.5 (No xylanase and xylosidase production)
 
 # %%
-initial_training_states=torch.rand(10000,4)*1000
-action_labels=torch.tensor([[-10.,-10.]]*10000)
-for i in range(1000):
-    outs=env_1.agents[0].actor_network_(torch.tensor(initial_training_states))
-    env_1.agents[0].optimizer_policy_.zero_grad()
-    loss=nn.MSELoss()(outs,action_labels)
-    loss.backward()
-    env_1.agents[0].optimizer_policy_.step()
-    if i%10==0:
-        print(loss)
+# initial_training_states=torch.rand(10000,4)*1000
+# action_labels=torch.tensor([[-10.,-10.]]*10000)
+# for i in range(1000):
+#     outs=env_1.agents[0].actor_network_(torch.tensor(initial_training_states))
+#     env_1.agents[0].optimizer_policy_.zero_grad()
+#     loss=nn.MSELoss()(outs,action_labels)
+#     loss.backward()
+#     env_1.agents[0].optimizer_policy_.step()
+#     if i%10==0:
+#         print(loss)
     
 
 sim_1=tk.Simulation(name=env_1.name,
