@@ -719,20 +719,19 @@ class Simulation:
 
                 if batch%self.save_every==0:
                     if self.overwrite:
+                        data={"obs":batch_obs,"acts":batch_acts,"rews":env_rew,"batches_per_episode":self.env.episodes_per_batch,"episode_length":self.env.episode_length,"states":{ag.name:ag.observables+["time"] for ag in self.env.agents},"actions":{ag.name:ag.actions for ag in self.env.agents}}
                         with open(os.path.join(self.save_dir,self.name,self.name+".pkl"), 'wb') as f:
-                            pickle.dump(self.env, f)
-                        with open(os.path.join(self.save_dir,self.name,self.name+"_obs.pkl"), 'wb') as f:
-                            pickle.dump(batch_obs,f)
-                        with open(os.path.join(self.save_dir,self.name,self.name+"_acts.pkl"), 'wb') as f:
-                            pickle.dump(batch_acts,f)		
+                            pickle.dump(data, f)
+                        with open(os.path.join(self.save_dir,self.name,self.name+f"_env.pkl"), 'wb') as f:
+                            pickle.dump(env, f)
+	
                     else:
-                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}"+".pkl"), 'wb') as f:
-                            pickle.dump(self.env, f)
-                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}"+"_obs.pkl"), 'wb') as f:
-                            pickle.dump(batch_obs,f)
-                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}"+"_acts.pkl"), 'wb') as f:
-                            pickle.dump(batch_acts,f)
-
+                        data={"obs":batch_obs,"acts":batch_acts,"rews":env_rew,"batches_per_episode":self.env.episodes_per_batch,"episode_length":self.env.episode_length,"states":{ag.name:ag.observables+["time"] for ag in self.env.agents},"actions":{ag.name:ag.actions for ag in self.env.agents}}
+                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}.pkl"), 'wb') as f:
+                            pickle.dump(data, f)
+                        with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}_env.pkl"), 'wb') as f:
+                            pickle.dump(env, f)
+                            
             if verbose:
                 print(f"Batch {batch} finished:")
                 for agent in self.env.agents:
@@ -820,6 +819,8 @@ def _initialize_mp():
 
 def sqrt_variance_handler(batch):
     return 1/np.sqrt(batch+1)
+
+
 
 if __name__=="__main__":
     # from spamdfba import toymodels as tm
