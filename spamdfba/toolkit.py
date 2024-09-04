@@ -413,15 +413,15 @@ class Environment:
             Sols[i] = self.agents[i].model.optimize()
             self.time_dict["optimization"].append(time.time()-t_0)
             if Sols[i].status == 'infeasible':
-                # self.agents[i].reward=-1
+                self.agents[i].reward=-1
                 dCdt[i] = 0
             else:
                 dCdt[i] += Sols[i].objective_value*self.state[i]
-                #self.agents[i].reward = Sols[i].objective_value*self.state[i]
-            if self.t!=1:
-                self.agents[i].reward =0
-            else:
-                self.agents[i].reward = self.state[i]
+                self.agents[i].reward = Sols[i].objective_value*self.state[i]
+            # if self.t!=1:
+            #     self.agents[i].reward =0
+            # else:
+            #     self.agents[i].reward = self.state[i]
 
         for i in range(self.mapping_matrix["Mapping_Matrix"].shape[0]):
         
@@ -927,8 +927,8 @@ if __name__=="__main__":
 
     run_episode_single(env)
 
-    # sim=Simulation("test_RL_perf",env,"./")
-    # sim.run(parallel_framework="ray",initial_critic_error=2000)
+    sim=Simulation("test_RL_perf",env,"./")
+    sim.run(parallel_framework="ray",initial_critic_error=2000)
     with open("/Users/parsaghadermarzi/Desktop/Academics/Projects/SPAM-DFBA/spamdfba/test_RL_perf/test_RL_perf_2000_acts.pkl","rb") as f:
         acts=pickle.load(f)
     print(acts["agent1"])
