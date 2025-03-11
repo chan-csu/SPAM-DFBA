@@ -1,6 +1,9 @@
 from cobra import Model, Reaction, Metabolite
 import cobra
+import cobra.util
+import cobra.util.array
 import numpy as np
+
 """
 A Toy Model is a Cobra Model with the following:
 
@@ -132,7 +135,7 @@ ToyModel_SA.objective = 'X_Ex'
 ### Amylase Production ###
 Amylase_Prod = Reaction('Amylase_Prod')
 Amylase = Metabolite('Amylase', compartment='c')
-Amylase_Prod.add_metabolites({S_x: -1, ATP: -1, ADP: 1, Amylase: 0.1})
+Amylase_Prod.add_metabolites({S_x: -1, ATP: -1, ADP: 1, Amylase: 0.2})
 Amylase_Prod.lower_bound = 0
 Amylase_Prod.upper_bound = 1000
 ToyModel_SA.add_reactions([Amylase_Prod])
@@ -214,7 +217,7 @@ Toy_Model_NE_Aux_1.add_reactions([R_2_sp1])
 
 R_4_sp1 = Reaction('R_4_sp1')
 R_4_sp1.add_metabolites({ADP:1 ,ATP: -1})
-R_4_sp1.lower_bound = 0
+R_4_sp1.lower_bound = 1
 R_4_sp1.upper_bound = 1000
 Toy_Model_NE_Aux_1.add_reactions([R_4_sp1])
 
@@ -302,7 +305,7 @@ Toy_Model_NE_Aux_2.add_reactions([R_3_sp2])
 
 R_4_sp2 = Reaction('R_4_sp2')
 R_4_sp2.add_metabolites({ADP:1 ,ATP: -1})
-R_4_sp2.lower_bound = 0
+R_4_sp2.lower_bound = 1
 R_4_sp2.upper_bound = 1000
 Toy_Model_NE_Aux_2.add_reactions([R_4_sp2])
 
@@ -889,14 +892,12 @@ if __name__ == '__main__':
 	# print(ToyModel_SA.optimize().fluxes)
 	# print(ToyModel_SA.optimize().status)
 	# print(ToyModel_SA.exchanges)
-	
-	print(Toy_Model_NE_Aux_1.optimize().fluxes)
-	print(Toy_Model_NE_Aux_1.optimize().status)
-	print(Toy_Model_NE_Aux_1.exchanges)
-
-	print(Toy_Model_NE_Aux_2.optimize().fluxes)
-	print(Toy_Model_NE_Aux_2.optimize().status)
-	print(Toy_Model_NE_Aux_2.exchanges)
+	import pandas as pd
+	print(pd.DataFrame(cobra.util.array.create_stoichiometric_matrix(Toy_Model_NE_Aux_1),columns=[i.id for i in Toy_Model_NE_Aux_1.reactions],index=[i.id for i in Toy_Model_NE_Aux_1.metabolites]).to_string())
+	print(pd.DataFrame(cobra.util.array.create_stoichiometric_matrix(Toy_Model_NE_Aux_2),columns=[i.id for i in Toy_Model_NE_Aux_2.reactions],index=[i.id for i in Toy_Model_NE_Aux_2.metabolites]).to_string())
+	print([(i.lower_bound,i.id,i.upper_bound) for i in Toy_Model_NE_Aux_2.reactions])
+	print([(i.lower_bound,i.id,i.upper_bound) for i in Toy_Model_NE_Aux_1.reactions])
+ 
 
 	# print(Toy_Model_NE_Mut_1.optimize().fluxes)
 	# print(Toy_Model_NE_Mut_1.optimize().status)

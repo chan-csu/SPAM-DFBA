@@ -49,7 +49,7 @@ class ActorNN(nn.Module):
         n_hidden (int): number of hidden layers in the neural network.
      
     """
-    def __init__(self,input_dim:int,output_dim:int,clip:list[list],hidden_dim:int=20,activation=nn.ReLU,n_hidden:int=5)-> None:
+    def __init__(self,input_dim:int,output_dim:int,hidden_dim:int=20,activation=nn.ReLU,n_hidden:int=2)-> None:
         super(ActorNN,self).__init__()
         self.inlayer=nn.Sequential(nn.Linear(input_dim,hidden_dim),activation())
         # self.hidden=nn.Sequential(*[nn.Linear(hidden_dim,hidden_dim),activation()]*n_hidden)
@@ -59,14 +59,15 @@ class ActorNN(nn.Module):
             hidden_layers.append(activation())
         self.hidden=nn.Sequential(*hidden_layers)
         self.output=nn.Linear(hidden_dim,output_dim)
-        self.clip=torch.tensor(clip)
+        self.limit=torch.nn.Tanh()
 
     
     def forward(self, obs:torch.FloatTensor)-> torch.FloatTensor:
         out=self.inlayer(obs)
         out=self.hidden(out)
         out=self.output(out)
-        out=torch.clamp(out,self.clip[:,0],self.clip[:,1])
+        # out=self.limit(out)*5
+        # out=torch.clamp(out,self.clip[:,0],self.clip[:,1])
         # out=torch.clamp(out,self.clip[:,0],self.clip[:,1])
         return out
 
@@ -150,7 +151,6 @@ class Agent:
                 critic_network:CriticNN,
                 optimizer_critic:torch.optim.Adam,
                 optimizer_actor:torch.optim.Adam,
-                action_ranges:list[list],
                 actions:list[str],
                 observables:list[str],
                 gamma:float,
@@ -167,9 +167,10 @@ class Agent:
         self.optimizer_critic = optimizer_critic
         self.optimizer_actor = optimizer_actor
         self.gamma = gamma
-        self.observables = observables
+        self.observables = observables.copy()
+        self.observables_names=observables.copy()
         self.actions = [self.model.reactions.index(item) for item in actions]
-        self.observables = observables
+        self.actions_names=actions.copy()
         self.general_uptake_kinetics=general_uptake
         self.clip = clip
         self.lr_actor = lr_actor
@@ -177,7 +178,6 @@ class Agent:
         self.grad_updates = grad_updates
         self.actor_network = actor_network
         self.critic_network = critic_network
-        self.action_ranges=action_ranges
         self.variance_handler=variance_handler
         self.cov_var = torch.full(size=(len(self.actions),), fill_value=variance_handler(0))
         self.cov_mat = torch.diag(self.cov_var)
@@ -186,27 +186,34 @@ class Agent:
         This method will draw the actions from a normal distribution around the actor netwrok prediction.
         The derivatives are not calculated here.
         """
-        mean = self.actor_network_(torch.tensor(observation, dtype=torch.float32)).detach()
-        dist = MultivariateNormal(mean, self.cov_mat)
-        # dist = Normal(mean, self.actor_var)
-        action = dist.sample()
-        # log_prob =torch.sum(dist.log_prob(action))        
-        log_prob = dist.log_prob(action)
-        return action.detach().numpy(), log_prob
+        if len(self.actions):
+            mean = self.actor_network_(torch.tensor(observation, dtype=torch.float32)).detach()
+            dist = MultivariateNormal(mean, self.cov_mat)
+            # dist = Normal(mean, self.actor_var)
+            action = dist.sample()
+            # log_prob =torch.sum(dist.log_prob(action))        
+            log_prob = dist.log_prob(action)
+            return action.detach().numpy(), log_prob
+        else:
+            return [],[]
    
     def evaluate(self, batch_obs:np.ndarray ,batch_acts:np.ndarray):
         """ 
         Calculates the value of the states, as well as the log probability af the actions that are taken.
         The derivatives are calculated here.
         """
-        V = self.critic_network_(batch_obs).squeeze()
-        mean = self.actor_network_(batch_obs)
-        dist = MultivariateNormal(mean, self.cov_mat)
-        # dist = Normal(mean, self.actor_var)
-        # log_probs = torch.sum(dist.log_prob(batch_acts),dim=1)
-        log_probs = dist.log_prob(batch_acts)
+        if len(self.actions):
+            V = self.critic_network_(batch_obs).squeeze()
+            mean = self.actor_network_(batch_obs)
+            dist = MultivariateNormal(mean, self.cov_mat)
+            # dist = Normal(mean, self.actor_var)
+            # log_probs = torch.sum(dist.log_prob(batch_acts),dim=1)
+            log_probs = dist.log_prob(batch_acts)
 
-        return V, log_probs 
+            return V, log_probs 
+
+        else:
+            return [],[]
     
     def compute_rtgs(self, batch_rews:list):
         """Given a batch of rewards , it calculates the discouted return for each state for that batch"""
@@ -408,7 +415,7 @@ class Environment:
                 if M.a[index]<0:
                     M.model.reactions[M.actions[index]].lower_bound=max(M.a[index],M.model.reactions[M.actions[index]].lower_bound)
                 else:
-                    M.model.reactions[M.actions[index]].lower_bound=min(M.a[index],10)
+                    M.model.reactions[M.actions[index]].lower_bound=min(M.a[index],100)
             t_0=time.time() 
             Sols[i] = self.agents[i].model.optimize()
             self.time_dict["optimization"].append(time.time()-t_0)
@@ -416,12 +423,13 @@ class Environment:
                 self.agents[i].reward=-1
                 dCdt[i] = 0
             else:
+                self.agents[i].reward = 0
                 dCdt[i] += Sols[i].objective_value*self.state[i]
-                self.agents[i].reward = Sols[i].objective_value*self.state[i]
+                self.agents[i].reward = Sols[i].objective_value *self.state[i]
             # if self.t!=1:
-            #     self.agents[i].reward =0
+            #     pass
             # else:
-            #     self.agents[i].reward = self.state[i]
+            #     self.agents[i].reward += self.state[i]
 
         for i in range(self.mapping_matrix["Mapping_Matrix"].shape[0]):
         
@@ -459,7 +467,7 @@ class Environment:
         """ Sets up the networks and optimizers for the agents in the environment."""
         if self.training==True:
             for agent in self.agents:
-                agent.actor_network_=agent.actor_network(len(agent.observables)+1,len(agent.actions),agent.action_ranges)
+                agent.actor_network_=agent.actor_network(len(agent.observables)+1,len(agent.actions))
                 agent.critic_network_=agent.critic_network(len(agent.observables)+1,1)
                 agent.optimizer_value_ = agent.optimizer_critic(agent.critic_network_.parameters(), lr=agent.lr_critic)
                 agent.optimizer_policy_ = agent.optimizer_actor(agent.actor_network_.parameters(), lr=agent.lr_actor)
@@ -576,7 +584,7 @@ def run_episode_ray(env:Environment)->tuple:
         for agent in env.agents:   
             action, log_prob = agent.get_actions(np.hstack([obs[agent.observables],env.t]))
             agent.a=action
-            agent.log_prob=log_prob.detach() 
+            agent.log_prob=log_prob.detach() if len(agent.actions) else log_prob
         t_0_step=time.time()
         s,r,a,sp=env.step()
         env.time_dict["step"].append(time.time()-t_0_step)
@@ -637,22 +645,23 @@ class Simulation:
             report (dict): Includes the reported time at each step
     """
     
-    def __init__(self,name:str,env:Environment,save_dir:str,save_every:int=200,overwrite:bool=False):
+    def __init__(self,name:str,env:Environment,save_dir:str,save_every:int=200,overwrite:bool=False,pre_trained:bool=False)->None:
         self.name=name
         self.env=env
         self.save_dir=save_dir
         self.save_every=save_every
         self.overwrite=overwrite
         self.report={}
+        self.pre_trained=pre_trained
         
     
-    def run(self,solver:str="glpk",verbose:bool=True,initial_critic_error:float=100,parallel_framework:str="native")->Environment:
+    def run(self,solver:str="glpk",verbose:bool=True,pretrain_iter:int=10000,parallel_framework:str="native")->Environment:
         """This method runs the training loop
         
         Args:
             solver (str): The solver to be used by cobrapy
             verbose (bool): whether to print the training results after each iteration
-            initial_critic_error (float): To make the training faster this method first trains the critic network on the first batch of episodes to
+            pretrain_iter (int): The number of iterations to pretrain the critic and actor networks to output zero actions.
             make the critic network produce more realistic values in the beginning. This parameter defines what is the allowable MSE of the critic network
             on the first batch of data obtained from the evironment
         Returns:
@@ -666,7 +675,8 @@ class Simulation:
             "optimization":[],
             "batch":[],
             "simulation":[]
-        }            
+        }
+        all_rewards={agent.name:[] for agent in self.env.agents}            
         if not os.path.exists(os.path.join(self.save_dir,self.name)):
             os.makedirs(os.path.join(self.save_dir,self.name))
             
@@ -677,60 +687,73 @@ class Simulation:
             for agent in self.env.agents:
                 agent.cov_var = torch.full(size=(len(agent.actions),), fill_value=agent.variance_handler(batch))
                 agent.cov_mat = torch.diag(agent.cov_var)
-            
+            if batch==0 and self.pre_trained==False:
+                random_s=torch.FloatTensor(np.random.rand(10000,len(agent.observables)+1))*1000
+                random_a=torch.tensor(np.zeros((10000,len(agent.actions))),dtype=torch.float32)
+                for agent in self.env.agents:
+                    for _ in range(pretrain_iter):   
+                        agent.optimizer_policy_.zero_grad()
+                        acts=agent.actor_network_(random_s)
+                        actor_loss=nn.MSELoss()(acts,random_a)
+                        actor_loss.backward()
+                        agent.optimizer_policy_.step()
+                
             batch_obs,batch_acts, batch_log_probs, batch_rtgs,batch_times,env_rew=rollout(self.env,parallel_framework=parallel_framework) 
             self.report["times"]["step"].append(np.mean(batch_times["step"]))
             self.report["times"]["optimization"].append(np.mean(batch_times["optimization"]))
             self.report["times"]["batch"].append(np.mean(batch_times["batch"]))
             for agent in self.env.agents:
                 self.report["returns"][agent.name].append(env_rew[agent.name])
-                V, _= agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])  
-                A_k = batch_rtgs[agent.name] - V.detach()       
-                A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-5)   
-                if batch==0:
-                    if verbose:
-                        print("Hold on, bringing the creitc network to range ...")
-                        err=initial_critic_error+1
-                        while err>initial_critic_error:   
-                            V, _= agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])  
-                            critic_loss = nn.MSELoss()(V, batch_rtgs[agent.name])   
-                            agent.optimizer_value_.zero_grad()  
-                            critic_loss.backward()  
-                            agent.optimizer_value_.step()   
-                            err=critic_loss.item() 
-                            print(f"Current error is {err}") 
-                    if verbose:
-                        print("Done!")   
+                V, _= agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])   
+                if batch==0 and self.pre_trained==False:
+                    if len(agent.actions):
+                        if verbose:
+                            print("Hold on, bringing the creitc network to range ...")
+                            for _ in range(pretrain_iter):   
+                                V, _= agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])  
+                                critic_loss = nn.MSELoss()(V, batch_rtgs[agent.name])   
+                                agent.optimizer_value_.zero_grad()  
+                                critic_loss.backward()  
+                                agent.optimizer_value_.step()   
+                                print(f"Current critic error is {critic_loss.item()} , Current actor error is {actor_loss.item()}")
+                        if verbose:
+                            print("Done!")   
                 else: 
-                    for _ in range(agent.grad_updates):                                                      
-                        
-                        V, curr_log_probs = agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])
-                        ratios = torch.exp(curr_log_probs - batch_log_probs[agent.name])
-                        surr1 = ratios * A_k.detach()
-                        surr2 = torch.clamp(ratios, 1 - agent.clip, 1 + agent.clip) * A_k
-                        actor_loss = (-torch.min(surr1, surr2)).mean()
-                        critic_loss = nn.MSELoss()(V, batch_rtgs[agent.name])
-                        agent.optimizer_policy_.zero_grad()
-                        actor_loss.backward(retain_graph=False)
-                        agent.optimizer_policy_.step()
-                        agent.optimizer_value_.zero_grad()
-                        critic_loss.backward()
-                        agent.optimizer_value_.step()                                                            
+                    if len(agent.actions):
+                        for _ in range(agent.grad_updates):                                                      
+                            V, curr_log_probs = agent.evaluate(batch_obs[agent.name],batch_acts[agent.name])
+                            A_k = batch_rtgs[agent.name] - V.detach()       
+                            A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-5)  
+                            ratios = torch.exp(curr_log_probs - batch_log_probs[agent.name])
+                            surr1 = ratios * A_k.detach()
+                            surr2 = torch.clamp(ratios, 1 - agent.clip, 1 + agent.clip) * A_k
+                            actor_loss = (-torch.min(surr1, surr2)).mean()
+                            critic_loss = nn.MSELoss()(V, batch_rtgs[agent.name])
+                            agent.optimizer_policy_.zero_grad()
+                            actor_loss.backward(retain_graph=False)
+                            agent.optimizer_policy_.step()
+                            agent.optimizer_value_.zero_grad()
+                            critic_loss.backward()
+                            agent.optimizer_value_.step() 
+                
+                for agent in self.env.agents:
+                    all_rewards[agent.name].append(env_rew[agent.name])
+                                                                                
 
                 if batch%self.save_every==0:
                     if self.overwrite:
-                        data={"obs":batch_obs,"acts":batch_acts,"rews":env_rew,"batches_per_episode":self.env.episodes_per_batch,"episode_length":self.env.episode_length,"states":{ag.name:ag.observables+["time"] for ag in self.env.agents},"actions":{ag.name:ag.actions for ag in self.env.agents}}
+                        data={"obs":batch_obs,"acts":batch_acts,"rews":all_rewards,"batches_per_episode":self.env.episodes_per_batch,"episode_length":self.env.episode_length,"states":{ag.name:ag.observables_names+["time"] for ag in self.env.agents},"actions":{ag.name:ag.actions_names for ag in self.env.agents}}
                         with open(os.path.join(self.save_dir,self.name,self.name+".pkl"), 'wb') as f:
                             pickle.dump(data, f)
                         with open(os.path.join(self.save_dir,self.name,self.name+f"_env.pkl"), 'wb') as f:
-                            pickle.dump(env, f)
+                            pickle.dump(self.env, f)
 	
                     else:
-                        data={"obs":batch_obs,"acts":batch_acts,"rews":env_rew,"batches_per_episode":self.env.episodes_per_batch,"episode_length":self.env.episode_length,"states":{ag.name:ag.observables+["time"] for ag in self.env.agents},"actions":{ag.name:ag.actions for ag in self.env.agents}}
+                        data={"obs":batch_obs,"acts":batch_acts,"rews":all_rewards,"batches_per_episode":self.env.episodes_per_batch,"episode_length":self.env.episode_length,"states":{ag.name:ag.observables_names+["time"] for ag in self.env.agents},"actions":{ag.name:ag.actions_names for ag in self.env.agents}}
                         with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}.pkl"), 'wb') as f:
                             pickle.dump(data, f)
                         with open(os.path.join(self.save_dir,self.name,self.name+f"_{batch}_env.pkl"), 'wb') as f:
-                            pickle.dump(env, f)
+                            pickle.dump(self.env, f)
                             
             if verbose:
                 print(f"Batch {batch} finished:")
