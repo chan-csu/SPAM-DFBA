@@ -20,7 +20,7 @@ cd SPAM-DFBA
 pip install .
 
 ```
-Another approach is to directly install this package from pipy:
+Another approach is to directly install this package from pypi:
 
 ```
 pip install spamdfba
